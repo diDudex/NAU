@@ -7,12 +7,12 @@ import '../temas/theme_provider.dart';
 
 /*
     Pagina de Configuracion 
-    Muestra las opciones de configuracion de la aplicacion
+      Muestra las opciones de configuracion de la aplicacion
 
-    -Cambiar el tema
-    -Usuarios bloqueados
-    -Ajustes de cuenta
-    -Acerca de
+      -Cambiar el tema
+      -Usuarios bloqueados
+      -Ajustes de cuenta
+      -Acerca de
 */
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});

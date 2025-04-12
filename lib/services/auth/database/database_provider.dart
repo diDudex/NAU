@@ -6,21 +6,21 @@ import 'package:nau/services/auth/auth_services.dart';
 import 'package:nau/services/auth/database/database_service.dart';
 /*
   DatabaseProvider
-  Este proveedor sirve para separar el manejo de datos de Firestore y 
-  la interfaz de usuario de nuestra aplicación.
-  -----------------------------------------------------------------------------------------------
-  - Este proveedor sirve para separar el manejo de datos de Firestore y 
-  la interfaz de usuario de la aplicación
-  - El DatabaseProvider procesa los datos para mostrarlos en la aplicación.
+    Este proveedor sirve para separar el manejo de datos de Firestore y 
+    la interfaz de usuario de nuestra aplicación.
+    -----------------------------------------------------------------------------------------------
+    - Este proveedor sirve para separar el manejo de datos de Firestore y 
+    la interfaz de usuario de la aplicación
+    - El DatabaseProvider procesa los datos para mostrarlos en la aplicación.
 
-  -----------------------------------------------------------------------------------------------
-  Esto es para hacer que nuestro código sea mucho más modular, más limpio y más fácil de leer y probar.
+    -----------------------------------------------------------------------------------------------
+    Esto es para hacer que nuestro código sea mucho más modular, más limpio y más fácil de leer y probar.
 
-  A medida que aumenta el número de páginas, necesitamos que este proveedor administre 
-  adecuadamente los diferentes estados de la aplicación.
+    A medida que aumenta el número de páginas, necesitamos que este proveedor administre 
+    adecuadamente los diferentes estados de la aplicación.
 
-  Además, si un día decidimos cambiar su backend (de Firebase a otra cosa, entonces es 
-  mucho más fácil administrar y cambiar diferentes bases de datos)
+    Además, si un día decidimos cambiar su backend (de Firebase a otra cosa, entonces es 
+    mucho más fácil administrar y cambiar diferentes bases de datos)
 */
 
 class DatabaseProvider extends ChangeNotifier {

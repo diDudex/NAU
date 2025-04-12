@@ -6,16 +6,16 @@ import '../pages/profile_page.dart';
 import '../pages/settings_page.dart';
 
 /*
- Drawer
- este es un coso de menú al que generalmente se accede 
- desde el lado izquierdo de las appbar
- -------------------------------------------------------------------
- Este menu tendra:
-  -Home 
-  -Perfil
-  -Buscar
-  -Configuración
-  -Cerrar sesión
+  Drawer
+    este es un coso de menú al que generalmente se accede 
+    desde el lado izquierdo de las appbar
+    -------------------------------------------------------------------
+    Este menu tendra:
+      -Home 
+      -Perfil
+      -Buscar
+      -Configuración
+      -Cerrar sesión
 */
 class MyDrawer extends StatelessWidget {
   MyDrawer({super.key});

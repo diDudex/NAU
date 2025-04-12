@@ -2,15 +2,15 @@ import 'package:flutter/material.dart';
 
 /*
 
-Lista SettingsTile personalizada
-Esta clase es un componente que se puede utilizar en cualquier parte de la aplicación para mostrar una lista de ajustes
-----------------------------------------------------------------------------
+  Lista SettingsTile personalizada
+    Esta clase es un componente que se puede utilizar en cualquier parte de la aplicación para mostrar una lista de ajustes
+    ----------------------------------------------------------------------------
 
- para usar este widget se necesita:
+    para usar este widget se necesita:
 
-  -titulo (ejemplo "Modo oscuro")
-  -icono (ejemplo Icons.brightness_4)
-  -accion (ejemplo cambiar el tema a oscuro (toggleTheme) )
+      -titulo (ejemplo "Modo oscuro")
+      -icono (ejemplo Icons.brightness_4)
+      -accion (ejemplo cambiar el tema a oscuro (toggleTheme) )
 
 */
 

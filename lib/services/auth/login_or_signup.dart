@@ -4,16 +4,16 @@ import 'package:nau/pages/login.dart';
 import '../../pages/signup.dart';
 
 /*
-LoginOrSignup
-esta clase es la encargada de mostrar la pantalla de inicio de sesión o registro
---------------------------------------------------------------------------------
-Esta pantalla tendra:
-  -titulo
-  -boton de inicio de sesión
-  -boton de registro
-  --------------------------------------------------------------------------
-  Si el usuario no tiene cuenta, puede hacer clic en el boton de registro y lo llevara a la pantalla de registro
-  Si el usuario ya tiene cuenta, puede hacer clic en el boton de inicio de sesión y lo llevara a la pantalla de inicio de sesión
+  LoginOrSignup
+    esta clase es la encargada de mostrar la pantalla de inicio de sesión o registro
+    --------------------------------------------------------------------------------
+    Esta pantalla tendra:
+      -titulo
+      -boton de inicio de sesión
+      -boton de registro
+      --------------------------------------------------------------------------
+      Si el usuario no tiene cuenta, puede hacer clic en el boton de registro y lo llevara a la pantalla de registro
+      Si el usuario ya tiene cuenta, puede hacer clic en el boton de inicio de sesión y lo llevara a la pantalla de inicio de sesión
 */
 class LoginOrSignup extends StatefulWidget {
   const LoginOrSignup({super.key});

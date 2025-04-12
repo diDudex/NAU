@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 
 /* 
-TextField
-la chingadera donde se puede escribir
---------------------------------------
- debe de tener:
- - Text controller
- - sugerencias (ejemplo: "Escribe tu nombre")
- - ocultar contraseña (ejemplo: ********)
+  TextField
+    la chingadera donde se puede escribir
+    --------------------------------------
+    debe de tener:
+    - Text controller
+    - sugerencias (ejemplo: "Escribe tu nombre")
+    - ocultar contraseña (ejemplo: ********)
 */
 class MyTextField extends StatefulWidget {
   final TextEditingController controller;

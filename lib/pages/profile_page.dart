@@ -11,9 +11,9 @@ import '../helper/navigate_pages.dart';
 
 /*
   Pagina de perfil
-  Esta es una página de perfil para un uid determinado
-  -----------------------------------------------------------------------------------------------
-    1:56:39
+    Esta es una página de perfil para un uid determinado
+    -----------------------------------------------------------------------------------------------
+      1:56:39
 */
 
 class ProfilePage extends StatefulWidget {

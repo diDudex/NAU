@@ -5,16 +5,16 @@ import 'package:nau/components/my_text_field.dart';
 import 'package:nau/services/auth/auth_services.dart';
 
 /*
-LoginPage
-esta pantalla es la encargada de mostrar el formulario de inicio de sesión
------------------------------------------------------------------------------
-Esta pantalla tendra:
-  -titulo
-  -formulario de inicio de sesión
-  -boton de inicio de sesión
-  --------------------------------------------------------------------------
-  Si el usuario no tiene cuenta, puede hacer clic en el boton de registro y lo llevara a la pantalla de registro
-  -boton de registro
+  LoginPage
+    esta pantalla es la encargada de mostrar el formulario de inicio de sesión
+    -----------------------------------------------------------------------------
+    Esta pantalla tendra:
+      -titulo
+      -formulario de inicio de sesión
+      -boton de inicio de sesión
+      --------------------------------------------------------------------------
+      Si el usuario no tiene cuenta, puede hacer clic en el boton de registro y lo llevara a la pantalla de registro
+      -boton de registro
 */
 class Login extends StatefulWidget {
   final void Function()? onTap;

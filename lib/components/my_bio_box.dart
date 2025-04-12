@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 
 /*
   MyBioBox
-  Este es un cuadro simple con texto adentro. Sse usara para la biografía del usuario 
-  en sus páginas de perfil
-  -----------------------------------------------------------------------------------------------
-  Este widget contiene solo un texto, pero se puede personalizar para contener más cosas
+    Este es un cuadro simple con texto adentro. Sse usara para la biografía del usuario 
+    en sus páginas de perfil
+    -----------------------------------------------------------------------------------------------
+    Este widget contiene solo un texto, pero se puede personalizar para contener más cosas
 
 */
 class MyBioBox extends StatelessWidget {

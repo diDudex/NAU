@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 /*
   MyInputAlertBox
- Este es un cuadro de diálogo de alerta que tiene un campo de texto donde el usuario puede escribir.
-  se usara para cosas como editar la biografía, publicar un mensaje nuevo, etc
-  -----------------------------------------------------------------------------------------------
-  Este widget contiene:
-  - Text Controller (pa que el usuario escriba)
-  - Hint Text (ejemplo: "Escribe tu biografía")
-  - Una función  (ejemplo: updateBio)
-  - Texto del botón (ejemplo: "Actualizar")
+    Este es un cuadro de diálogo de alerta que tiene un campo de texto donde el usuario puede escribir.
+      se usara para cosas como editar la biografía, publicar un mensaje nuevo, etc
+      -----------------------------------------------------------------------------------------------
+      Este widget contiene:
+      - Text Controller (pa que el usuario escriba)
+      - Hint Text (ejemplo: "Escribe tu biografía")
+      - Una función  (ejemplo: updateBio)
+      - Texto del botón (ejemplo: "Actualizar")
 */
 
 class MyInputAlertBox extends StatelessWidget {

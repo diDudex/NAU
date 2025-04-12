@@ -3,12 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:nau/services/auth/login_or_signup.dart';
 import '../../pages/home_page.dart';
 /*
-Puerta de autenticacion
-esto servira para checar si el usuario esta registrado o no
-----------------------------------------------------------------------------------------------------------------
- Si el usuario ya esta logeado lo mandara a la pantalla de inicio
- si el usuario no esta registrado lo mandara a la pantalla de registro o login
- 
+  Puerta de autenticacion
+    esto servira para checar si el usuario esta registrado o no
+    ----------------------------------------------------------------------------------------------------------------
+    Si el usuario ya esta logeado lo mandara a la pantalla de inicio
+    si el usuario no esta registrado lo mandara a la pantalla de registro o login
+  
 */
 
 

@@ -1,13 +1,13 @@
 /*
-Datos del usuario
-aqui se guardara todo lo que el usuario deberia de tener en su perfil
-------------------------------------------------------------------------------------------------------------
-  -uid
-  -nombre
-  -correo
-  -username
-  -biografia
-  -foto de perfil
+  Datos del usuario
+    aqui se guardara todo lo que el usuario deberia de tener en su perfil
+    ------------------------------------------------------------------------------------------------------------
+      -uid
+      -nombre
+      -correo
+      -username
+      -biografia
+      -foto de perfil
 */
 
 import 'package:cloud_firestore/cloud_firestore.dart';

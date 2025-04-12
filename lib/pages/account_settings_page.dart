@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:nau/services/auth/auth_services.dart';
 /*
    Esta página contiene varias configuraciones relacionadas con la cuenta de usuario: 
-   -eliminar su propia cuenta
-    (esta función es un requisito si desea publicar esto en la tienda de aplicaciones)
+    -eliminar su propia cuenta
+      (esta función es un requisito si desea publicar esto en la tienda de aplicaciones)
 */
 
 class AccountSettingsPage extends StatefulWidget {

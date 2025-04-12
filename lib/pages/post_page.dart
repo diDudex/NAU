@@ -8,9 +8,9 @@ import 'package:provider/provider.dart';
 import '../services/auth/database/database_provider.dart';
 /*
    Post Page
-   Esta pantalla mostrara:
-  - post individual
-  - comentarios del post
+    Esta pantalla mostrara:
+    - post individual
+    - comentarios del post
 */
 
 class PostPage extends StatefulWidget {

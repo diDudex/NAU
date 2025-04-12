@@ -1,8 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 /*
- Modelo de comentarios
-  -----------------------------------------------------------------------------------------------
-  este modelo se usara para almacenar los comentarios de los usuarios en la base de datos
+  Modelo de comentarios
+    -----------------------------------------------------------------------------------------------
+    este modelo se usara para almacenar los comentarios de los usuarios en la base de datos
 */
 
 class Comment {

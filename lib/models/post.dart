@@ -1,6 +1,6 @@
 /*
   Post Model
-  esto es lo que cada publicacion deberia de tener
+  
 */
 
 import 'package:cloud_firestore/cloud_firestore.dart';

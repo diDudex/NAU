@@ -5,14 +5,14 @@ import 'package:provider/provider.dart';
 import '../services/auth/auth_services.dart';
 import '../services/auth/database/database_provider.dart';
 /*
- Comment tile
- Este es el widget de  comentarios que va debajo de una publicación
- Es pacerido al widget de publicaciones 
- pero los comentarios se ven diferentes a las publicaciones
-  -----------------------------------------------------------------------------------------------
-  nomas se necesita:
-  - el comentario
-  - una funcion para cuando le demos un click al nombre del usuario para ver el perfil
+  Comment tile
+    Este es el widget de  comentarios que va debajo de una publicación
+    Es pacerido al widget de publicaciones 
+    pero los comentarios se ven diferentes a las publicaciones
+      -----------------------------------------------------------------------------------------------
+      nomas se necesita:
+      - el comentario
+      - una funcion para cuando le demos un click al nombre del usuario para ver el perfil
 */
 class MyCommentTile extends StatelessWidget { 
   final Comment comment;

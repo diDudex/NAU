@@ -3,8 +3,8 @@ import 'package:nau/services/auth/database/database_provider.dart';
 import 'package:provider/provider.dart';
 /*
   Página de usuarios bloqueados
-Esta página muestra una lista de usuarios que han sido bloqueados
-- Puedes desbloquear usuarios aquí
+    Esta página muestra una lista de usuarios que han sido bloqueados
+    - Puedes desbloquear usuarios aquí
 */
 
 class BlockedUsersPage extends StatefulWidget {

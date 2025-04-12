@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 
 /* 
 
-Botton personalizado
------------------------------------------------------------------------------
-esto necesita:
-- texto
-- funcion al hacer clic
+  Botton personalizado
+    -----------------------------------------------------------------------------
+    esto necesita:
+    - texto
+    - funcion al hacer clic
 
 */
 

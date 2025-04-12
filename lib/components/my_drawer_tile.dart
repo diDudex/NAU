@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 
 /*
- Drawer tile
- esa cosa es como un moldelo de un item de un menu
+  Drawer tile
+  esa cosa es como un moldelo de un item de un menu
 
- ----------------------------------------------------
-  Este widget tendra:
-    -icono (ejemplo Icons.home)
-    -titulo (ejemplo "Home")
-    -accion (ejemplo navegar a la pagina de inicio (goToHomePage) )
+  ----------------------------------------------------
+    Este widget tendra:
+      -icono (ejemplo Icons.home)
+      -titulo (ejemplo "Home")
+      -accion (ejemplo navegar a la pagina de inicio (goToHomePage) )
 */
 class MyDrawerTile extends StatefulWidget {
   final String title;

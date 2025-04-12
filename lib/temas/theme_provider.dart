@@ -4,7 +4,7 @@ import '../temas/light_mode.dart';
 
 /*
 
-Aqui se define  y se cambia el tema de la aplicación
+  Aqui se define  y se cambia el tema de la aplicación
 
 */
 

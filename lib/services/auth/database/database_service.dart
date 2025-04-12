@@ -8,15 +8,15 @@ import '../../../models/comments.dart';
 
 /*
  Servicios de la base de datos
- Esta clase maneja todos los datos desde y hacia Firebase.
- --------------------------------------------------------------------------------
- -User profile
- - Publicaciones (post)
- - Likes
- - Comentarios
- - Seguidores/seguidos
- - Usuarios buscados
- - Cosas de la cuenta (reportes/bloqueos/cuenta/eliminar cuenta)
+  Esta clase maneja todos los datos desde y hacia Firebase.
+  --------------------------------------------------------------------------------
+  -User profile
+  - Publicaciones (post)
+  - Likes
+  - Comentarios
+  - Seguidores/seguidos
+  - Usuarios buscados
+  - Cosas de la cuenta (reportes/bloqueos/cuenta/eliminar cuenta)
 */
 class DatabaseService {
 //obtiene la instancia de firestore db y auth
@@ -25,9 +25,9 @@ class DatabaseService {
 
 /*
   Perfil de usuario
-  Cuando un nuevo usuario se registra, se crea una cuenta para él, pero también almacenamos sus 
-  detalles en la base de datos para mostrarlos en su página de perfil.
-  -----------------------------------------------------------------------------------------------
+    Cuando un nuevo usuario se registra, se crea una cuenta para él, pero también almacenamos sus 
+    detalles en la base de datos para mostrarlos en su página de perfil.
+    -----------------------------------------------------------------------------------------------
 
 */
 

@@ -9,8 +9,8 @@ import '../components/my_drawer.dart';
 
 /*
   HOME PAGE
-  Esta es la página de inicio de la aplicación: muestra las publicaciones de los usuarios
-  -----------------------------------------------------------------------------------------------
+    Esta es la página de inicio de la aplicación: muestra las publicaciones de los usuarios
+    -----------------------------------------------------------------------------------------------
 */
 class HomePage extends StatefulWidget {
   const HomePage({super.key});

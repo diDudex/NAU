@@ -1,14 +1,13 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:nau/services/auth/database/database_service.dart';
 /*
-Servicio de autenticación
-esto servira para autenticarse con firebase
-----------------------------------------------------------------------------------------------------------------
--Login
--Registro
--Logout
--Eliminar cuenta
-
+  Servicio de autenticación
+    esto servira para autenticarse con firebase
+    ----------------------------------------------------------------------------------------------------------------
+    -Login
+    -Registro
+    -Logout
+    -Eliminar cuenta
 */
 
 class AuthService {

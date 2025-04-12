@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 /*
- Circulo de carga
+  Circulo de carga
 */
 
 //ver el circulo de carga

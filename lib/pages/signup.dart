@@ -7,21 +7,21 @@ import '../components/my_loading_circle.dart';
 import '../components/my_text_field.dart';
 
 /*
-Pantalla de registro
-esta pantalla es la encargada de mostrar el formulario de registro
------------------------------------------------------------------------------
-Necesita:
-  -titulo
-  -formulario de registro
-    -nombre
-    -correo
-    -contraseña
-    -confirmar contraseña
-  -boton de registro
-    - este boton creara la cuenta del usuario y lo llevara a la pantalla de inicio
-  --------------------------------------------------------------------------
-  Si el usuario ya tiene cuenta, puede hacer clic en el boton de inicio de sesión y lo llevara a la pantalla de inicio de sesión
-  -boton de "Ya tengo cuenta"
+  Pantalla de registro
+    esta pantalla es la encargada de mostrar el formulario de registro
+    -----------------------------------------------------------------------------
+    Necesita:
+      -titulo
+      -formulario de registro
+        -nombre
+        -correo
+        -contraseña
+        -confirmar contraseña
+      -boton de registro
+        - este boton creara la cuenta del usuario y lo llevara a la pantalla de inicio
+      --------------------------------------------------------------------------
+      Si el usuario ya tiene cuenta, puede hacer clic en el boton de inicio de sesión y lo llevara a la pantalla de inicio de sesión
+      -boton de "Ya tengo cuenta"
 
 */
 

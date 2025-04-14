@@ -33,7 +33,7 @@ void goBlockedUsersPage(BuildContext context){
   Navigator.push(
       context, 
     MaterialPageRoute(
-      builder: (context) => BlockedUsersPage(),
+      builder: (context) => const BlockedUsersPage(),
     ),
   );
 }
@@ -42,7 +42,7 @@ void goAccountSettingsPage(BuildContext context){
   Navigator.push(
       context, 
     MaterialPageRoute(
-      builder: (context) => AccountSettingsPage(),
+      builder: (context) => const AccountSettingsPage(),
     ),
   );
   }

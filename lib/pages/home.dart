@@ -1,21 +1,28 @@
 import 'package:flutter/material.dart';
+import 'package:nau/widgets/rutassugeridas.dart';
 
-class Home extends StatefulWidget {
-  const Home({super.key});
+class HomeScreen extends StatelessWidget {
+  final List<Map<String, String>> demoRoutes = [
+    {'origen': 'Centro', 'destino': 'Terminal Norte', 'tiempo': '25 min'},
+    {'origen': 'Universidad', 'destino': 'Centro', 'tiempo': '15 min'},
+  ];
 
-  @override
-  State<Home> createState() => _HomeState();
-}
-
-class _HomeState extends State<Home> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('NAU'),
-      ),
-      body: const Center(
-        child: Text('Welcome to NAU!'),
+      appBar: AppBar(title: Text('Inicio')),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Hola, Usuario', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            SizedBox(height: 16),
+            Text('Rutas sugeridas', style: TextStyle(fontSize: 18)),
+            SizedBox(height: 8),
+            RutasSugeridas(routes: demoRoutes),
+          ],
+        ),
       ),
     );
   }

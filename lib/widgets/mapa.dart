@@ -14,7 +14,7 @@ class _MapaScreenState extends State<MapaScreen> {
   void _onMapCreated(GoogleMapController controller) {
     mapController = controller;
   }
-
+//probando mapageno belico
   @override
   Widget build(BuildContext context) {
     return Scaffold(

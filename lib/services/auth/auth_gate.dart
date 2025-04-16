@@ -26,7 +26,7 @@ class AuthGate extends StatelessWidget {
       builder: (context, snapshot){
         if (snapshot.hasData){
           //si el usuario esta logeado
-          return  MapaScreen();
+          return  MainNavigation();
         } else {
           //si el usuario no esta logeado
           return const LoginOrSignup();

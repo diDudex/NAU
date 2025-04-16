@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class MapaScreen extends StatefulWidget {
   @override
@@ -7,26 +9,59 @@ class MapaScreen extends StatefulWidget {
 }
 
 class _MapaScreenState extends State<MapaScreen> {
-  late GoogleMapController mapController;
+  GoogleMapController? _mapController;
+  LatLng _initialPosition = LatLng(19.4326, -99.1332); // CDMX por default
+  Marker? _userMarker;
 
-  final LatLng _center = const LatLng(25.455162771340206, -108.06548121355324); // Buenos Aires 💙
-
-  void _onMapCreated(GoogleMapController controller) {
-    mapController = controller;
+  @override
+  void initState() {
+    super.initState();
+    _obtenerUbicacionActual();
   }
-//probando mapageno belico
+
+  Future<void> _obtenerUbicacionActual() async {
+    var permiso = await Permission.location.request();
+
+    if (permiso.isGranted) {
+      Position posicion = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      setState(() {
+        _initialPosition = LatLng(posicion.latitude, posicion.longitude);
+        _userMarker = Marker(
+          markerId: MarkerId("ubicacion_usuario"),
+          position: _initialPosition,
+          infoWindow: InfoWindow(title: "Estás aquí"),
+        );
+      });
+
+      _mapController?.animateCamera(
+        CameraUpdate.newCameraPosition(
+          CameraPosition(
+            target: _initialPosition,
+            zoom: 17,
+          ),
+        ),
+      );
+    } else {
+      print("Permiso denegado");
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Mapa de prueba'),
-      ),
+      appBar: AppBar(title: Text("Mapa del usuario")),
       body: GoogleMap(
-        onMapCreated: _onMapCreated,
         initialCameraPosition: CameraPosition(
-          target: _center,
-          zoom: 11.0,
+          target: _initialPosition,
+          zoom: 14,
         ),
+        markers: _userMarker != null ? {_userMarker!} : {},
+        myLocationEnabled: true,
+        myLocationButtonEnabled: true,
+        onMapCreated: (controller) => _mapController = controller,
       ),
     );
   }

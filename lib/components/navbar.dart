@@ -1,12 +1,10 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:nau/pages/home_page.dart';
-import 'package:nau/widgets/mapa.dart';
-import '../pages/rutasscreen.dart';
+import '../pages/mapa/RouteEditorScreen.dart';
+import '../pages/profile_page.dart';
 import '../pages/home.dart';
-import '../pages/profile_screen.dart';
 import '../pages/settings_page.dart';
 import '../pages/walletscreen.dart';
+import '../services/auth/auth_services.dart';
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
@@ -14,16 +12,17 @@ class MainNavigation extends StatefulWidget {
   @override
   _MainNavigationState createState() => _MainNavigationState();
 }
-
 class _MainNavigationState extends State<MainNavigation> {
   int _selectedIndex = 0;
 
-  final List<Widget> _screens = [
-    HomeScreen(),
-    Walletscreen(),
-    Rutasscreen(),
-    ProfileScreen(),
-    SettingsPage(),
+  String get currentUid => AuthService().getCurrentUid();
+
+  List<Widget> get _screens => [
+     HomeScreen(),
+    const Walletscreen(),
+    const RouteEditorScreen(),
+    ProfilePage(uid: currentUid),
+    const SettingsPage(),
   ];
 
   void _onItemTapped(int index) {

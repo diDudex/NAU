@@ -22,6 +22,10 @@ dependencies:
   ulid: ^2.0.1
   geocoding: ^3.0.0
   permission_handler: ^12.0.0+1
+  flutter_google_places_sdk: ^0.4.2+1
+  flutter_google_maps_webservices: ^1.1.1
+  flutter_polyline_points: ^2.1.0
+  flutter_google_places_hoc081098: ^2.0.0
 dev_dependencies:
   flutter_test:
     sdk: flutter

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:nau/services/auth/auth_gate.dart';
 import 'package:nau/firebase_options.dart';
 import 'package:nau/services/auth/database/database_provider.dart';
+import 'package:nau/services/auth/login_or_signup.dart';
 import '../temas/theme_provider.dart';
 import 'package:provider/provider.dart';
 
@@ -37,7 +38,7 @@ class MainApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       initialRoute: '/',
-      routes: {'/': (context) => const AuthGate()},
+      routes: {'/': (context) => AuthGate()},
       theme: Provider.of<ThemeProvider>(context).themeData,
     );
   }

@@ -1,10 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:nau/components/navbar.dart';
-import 'package:nau/pages/home.dart';
 import 'package:nau/services/auth/login_or_signup.dart';
-import 'package:nau/widgets/mapa.dart';
-import '../../pages/home_page.dart';
 /*
 Puerta de autenticacion
 esto servira para checar si el usuario esta registrado o no
@@ -26,7 +23,7 @@ class AuthGate extends StatelessWidget {
       builder: (context, snapshot){
         if (snapshot.hasData){
           //si el usuario esta logeado
-          return  MainNavigation();
+          return  const MainNavigation();
         } else {
           //si el usuario no esta logeado
           return const LoginOrSignup();

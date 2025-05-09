@@ -4,13 +4,15 @@ import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 class MapaScreen extends StatefulWidget {
+  const MapaScreen({super.key});
+
   @override
   _MapaScreenState createState() => _MapaScreenState();
 }
 
 class _MapaScreenState extends State<MapaScreen> {
   GoogleMapController? _mapController;
-  LatLng _initialPosition = LatLng(19.4326, -99.1332); // CDMX por default
+  LatLng _initialPosition = const LatLng(19.4326, -99.1332); // CDMX por default
   Marker? _userMarker;
 
   @override
@@ -30,9 +32,9 @@ class _MapaScreenState extends State<MapaScreen> {
       setState(() {
         _initialPosition = LatLng(posicion.latitude, posicion.longitude);
         _userMarker = Marker(
-          markerId: MarkerId("ubicacion_usuario"),
+          markerId: const MarkerId("ubicacion_usuario"),
           position: _initialPosition,
-          infoWindow: InfoWindow(title: "Estás aquí"),
+          infoWindow: const InfoWindow(title: "Estás aquí"),
         );
       });
 
@@ -52,7 +54,7 @@ class _MapaScreenState extends State<MapaScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Mapa del usuario")),
+      appBar: AppBar(title: const Text("Mapa del usuario")),
       body: GoogleMap(
         initialCameraPosition: CameraPosition(
           target: _initialPosition,

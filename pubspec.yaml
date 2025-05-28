@@ -26,6 +26,10 @@ dependencies:
   flutter_google_maps_webservices: ^1.1.1
   flutter_polyline_points: ^2.1.0
   flutter_google_places_hoc081098: ^2.0.0
+  qr_flutter: ^4.1.0
+  printing: ^5.14.2
+  pdf: ^3.11.3
+  intl: ^0.20.2
 dev_dependencies:
   flutter_test:
     sdk: flutter

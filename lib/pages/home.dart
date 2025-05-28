@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:nau/pages/mapa/mapade_rutas.dart'; // Asegúrate de importar el widget
+import 'package:nau/pages/mapa/mapade_rutas.dart'; 
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});

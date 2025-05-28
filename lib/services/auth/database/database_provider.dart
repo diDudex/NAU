@@ -5,8 +5,6 @@ import 'package:nau/models/user.dart';
 import 'package:nau/services/auth/auth_services.dart';
 import 'package:nau/services/auth/database/database_service.dart';
 
-import '../../../models/ruta.dart';
-import '../../ruta_database_service.dart';
 /*
   DatabaseProvider
   Este proveedor sirve para separar el manejo de datos de Firestore y 
@@ -267,9 +265,4 @@ class DatabaseProvider extends ChangeNotifier {
     notifyListeners(); */
   }
 // 2:56:33
-  final RutaDatabaseService _rutaService = RutaDatabaseService();
-
-  Stream<List<Ruta>> getRutasSugeridas() {
-    return _rutaService.getRutasSugeridas();
-}
-}
+  }

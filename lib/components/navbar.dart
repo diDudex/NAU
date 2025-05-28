@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../pages/mapa/RouteEditorScreen.dart';
 import '../pages/profile_page.dart';
 import '../pages/home.dart';
+import '../pages/seleccion.dart';
 import '../pages/settings_page.dart';
 import '../pages/walletscreen.dart';
 import '../services/auth/auth_services.dart';
@@ -23,6 +24,7 @@ class _MainNavigationState extends State<MainNavigation> {
     const RouteEditorScreen(),
     ProfilePage(uid: currentUid),
     const SettingsPage(),
+    const SeatSelectionScreen(),
   ];
 
   void _onItemTapped(int index) {
@@ -61,6 +63,10 @@ class _MainNavigationState extends State<MainNavigation> {
           BottomNavigationBarItem(
             icon: Icon(Icons.settings),
             label: 'Ajustes',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.event_seat),
+            label: 'Asientos',
           ),
         ],
       ),

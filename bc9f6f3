@@ -1,0 +1,10 @@
+[33ma3631d9[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mddx-1[m[33m, [m[1;31morigin/ddx-1[m[33m)[m HEAD@{0}: checkout: moving from bc9f6f3de40ab3ed26b7bcb577ef22e638f51bcd to ddx-1
+[33mbc9f6f3[m HEAD@{1}: commit: Mapa y ajustes
+[33mdb04398[m HEAD@{2}: commit: Api de google maps y screen de mapa funcionando
+[33m82707e6[m[33m ([m[1;32mddx-2[m[33m)[m HEAD@{3}: commit: Api de google maps y screen de mapa funcionando
+[33m6e51965[m HEAD@{4}: commit: Barnav y espera para la api
+[33ma3631d9[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mddx-1[m[33m, [m[1;31morigin/ddx-1[m[33m)[m HEAD@{5}: commit: Conexion con la base de datos
+[33m720ae17[m HEAD@{6}: pull --rebase origin main (start): checkout 720ae17b72289da99d5ccd6f51434312c98bdccd
+[33m96b4ca6[m[33m ([m[1;31morigin/main[m[33m, [m[1;32mmain[m[33m)[m HEAD@{7}: Branch: renamed refs/heads/main to refs/heads/main
+[33m96b4ca6[m[33m ([m[1;31morigin/main[m[33m, [m[1;32mmain[m[33m)[m HEAD@{9}: Branch: renamed refs/heads/master to refs/heads/main
+[33m96b4ca6[m[33m ([m[1;31morigin/main[m[33m, [m[1;32mmain[m[33m)[m HEAD@{11}: commit (initial): Inicio del proyecto

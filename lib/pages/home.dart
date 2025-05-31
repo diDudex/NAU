@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:nau/pages/mapa/mapade_rutas.dart';
 import 'package:nau/widgets/mapa.dart';
 import 'package:permission_handler/permission_handler.dart';
-
-import 'package:geolocator/geolocator.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});

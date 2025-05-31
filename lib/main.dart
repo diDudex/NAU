@@ -1,6 +1,7 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:nau/pages/login.dart';
+import 'package:nau/pages/perfilconfig.dart';
 import 'package:nau/services/auth/auth_gate.dart';
 import 'package:nau/firebase_options.dart';
 import 'package:nau/services/auth/database/database_provider.dart';
@@ -46,6 +47,10 @@ class MainApp extends StatelessWidget {
       routes: {
         '/': (context) => const AuthGate(),
         '/login': (context) => const Login(),
+        '/perfilconfig': (context) {
+          final userId = AuthService().getCurrentUid();
+          return PerfilConfig(userId: userId);
+        },
       },
       theme: Provider.of<ThemeProvider>(context).themeData,
     );

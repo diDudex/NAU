@@ -94,7 +94,6 @@ class _PerfilScreenState extends State<PerfilScreen>
                       MaterialPageRoute(
                         builder: (context) => PerfilConfig(
                           userId: currentUserId,
-                          userData: userData!.toMap(),
                         ),
                       ),
                     );
@@ -116,94 +115,91 @@ class _PerfilScreenState extends State<PerfilScreen>
               : userData != null
                   ? Padding(
                       padding: const EdgeInsets.all(20.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              CircleAvatar(
-                                radius: 70,
-                                backgroundColor:
-                                    const Color.fromARGB(255, 187, 184, 184),
-                                backgroundImage:
-                                    (userData!.profilePic.isNotEmpty)
-                                        ? NetworkImage(userData!.profilePic)
-                                        : null,
-                                child: (userData!.profilePic.isEmpty)
-                                    ? const Icon(Icons.person,
-                                        size: 70, color: Colors.grey)
-                                    : null,
-                              ),
-                              const SizedBox(width: 30),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    //Nickname
-                                    Text(
-                                      '@${userData!.username}',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 19,
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .inversePrimary,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 5),
-                                    //Nivel de cuenta
-                                    Text(
-                                      "Nivel:",
-                                      style: TextStyle(
-                                        fontSize: 15,
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .inversePrimary,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 5),
-                                    //Wallet
-                                    Text(
-                                      "Wallet:",
-                                      style: TextStyle(
-                                        fontSize: 15,
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .inversePrimary,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 20),
-                          if (userData!.bio.isNotEmpty) ...[
-                            Text(
-                              userData!.bio,
-                              style: const TextStyle(fontSize: 16),
-                            ),
-                          ],
-                          const Divider(),
-                          TabBar(
-                            controller: _tabController,
-                            tabs: const [
-                              Tab(text: 'Actividades'),
-                              Tab(text: 'Recomendaciones'),
-                            ],
-                          ),
-                          SizedBox(
-                            height:
-                                400, // Ajusta este valor según lo que quieras
-                            child: TabBarView(
-                              controller: _tabController,
+                      child: DefaultTabController(
+                        length: 2,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
                               children: [
-                                _buildActividadesView(),
-                                _buildRecomendacionesView(),
+                                CircleAvatar(
+                                  radius: 70,
+                                  backgroundColor:
+                                      const Color.fromARGB(255, 187, 184, 184),
+                                  backgroundImage:
+                                      (userData!.profilePic.isNotEmpty)
+                                          ? NetworkImage(userData!.profilePic)
+                                          : null,
+                                  child: (userData!.profilePic.isEmpty)
+                                      ? const Icon(Icons.person,
+                                          size: 70, color: Colors.grey)
+                                      : null,
+                                ),
+                                const SizedBox(width: 30),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      //Nickname
+                                      Text(
+                                        '@${userData!.username}',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 19,
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .inversePrimary,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 5),
+                                      //Nivel de cuenta
+                                      Text(
+                                        "Nivel:",
+                                        style: TextStyle(
+                                          fontSize: 15,
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .inversePrimary,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 5),
+                                      //Wallet
+                                      Text(
+                                        "Wallet:",
+                                        style: TextStyle(
+                                          fontSize: 15,
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .inversePrimary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               ],
                             ),
-                          ),
-                        ],
+                            const SizedBox(height: 20),
+                            const Divider(),
+                            TabBar(
+                              controller: _tabController,
+                              tabs: const [
+                                Tab(text: 'Actividades'),
+                                Tab(text: 'Recomendaciones'),
+                              ],
+                            ),
+                            SizedBox(
+                              height:
+                                  400, // Ajusta este valor según lo que quieras
+                              child: TabBarView(
+                                controller: _tabController,
+                                children: [
+                                  _buildActividadesView(),
+                                  _buildRecomendacionesView(),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     )
                   : const Center(

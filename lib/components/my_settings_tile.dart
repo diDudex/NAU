@@ -21,7 +21,7 @@ class MySettingsTile extends StatefulWidget {
   const MySettingsTile({
     super.key,     
     required this.title,
-    required this.action
+    required this.action,
     });
 
   @override

@@ -21,7 +21,6 @@ class UserProfile {
   final String lastName;
   final String email;
   final String username;
-  final String bio;
   final String profilePic;
   final String phoneNumber;
   final Timestamp birthDate;
@@ -32,7 +31,6 @@ class UserProfile {
     required this.lastName,
     required this.email,
     required this.username,
-    required this.bio,
     required this.profilePic,
     required this.phoneNumber,
     required this.birthDate,
@@ -49,7 +47,6 @@ class UserProfile {
       lastName: doc['lastName'] ?? '',
       email: doc['email'] ?? '',
       username: doc['username'] ?? '',
-      bio: doc['bio'] ?? '',
       profilePic: doc['profilePic'] ?? '',
       phoneNumber: doc['phoneNumber'] ?? '',
       birthDate: doc['birthDate'] is Timestamp ? doc['birthDate'] as Timestamp : Timestamp.now(),
@@ -68,7 +65,6 @@ class UserProfile {
       'lastName': lastName,
       'email': email,
       'username': username,
-      'bio': bio,
       'profilePic': profilePic,
       'phoneNumber': phoneNumber,
       'birthDate': birthDate,

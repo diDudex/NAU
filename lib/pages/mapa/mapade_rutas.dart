@@ -11,8 +11,10 @@ class LatLngTween extends Tween<LatLng> {
   @override
   LatLng lerp(double t) {
     // Interpolamos entre el punto de inicio y el final
-    final lat = (begin?.latitude ?? 0.0) + ((end?.latitude ?? 0.0) - (begin?.latitude ?? 0.0)) * t;
-    final lng = (begin?.longitude ?? 0.0) + ((end?.longitude ?? 0.0) - (begin?.longitude ?? 0.0)) * t;
+    final lat = (begin?.latitude ?? 0.0) +
+        ((end?.latitude ?? 0.0) - (begin?.latitude ?? 0.0)) * t;
+    final lng = (begin?.longitude ?? 0.0) +
+        ((end?.longitude ?? 0.0) - (begin?.longitude ?? 0.0)) * t;
     return LatLng(lat, lng);
   }
 }
@@ -24,7 +26,8 @@ class MapadeRutas extends StatefulWidget {
   MapadeRutasState createState() => MapadeRutasState();
 }
 
-class MapadeRutasState extends State<MapadeRutas> with TickerProviderStateMixin {
+class MapadeRutasState extends State<MapadeRutas>
+    with TickerProviderStateMixin {
   GoogleMapController? _mapController;
   List<LatLng> _routePoints = [];
   final List<Marker> _markers = [];
@@ -45,6 +48,7 @@ class MapadeRutasState extends State<MapadeRutas> with TickerProviderStateMixin 
     // Carga las rutas desde Firestore
     _loadRoutes();
   }
+  
 
   @override
   void dispose() {
@@ -54,20 +58,23 @@ class MapadeRutasState extends State<MapadeRutas> with TickerProviderStateMixin 
 
   Future<void> _loadRoutes() async {
     // Obtiene las rutas desde Firestore
-    FirebaseFirestore.instance.collection('busRoutes').snapshots().listen((snapshot) {
+    FirebaseFirestore.instance
+        .collection('busRoutes')
+        .snapshots()
+        .listen((snapshot) {
       for (var doc in snapshot.docs) {
         final data = doc.data();
         final route = data['polyline'] as List;
-        final List<LatLng> routePoints = route
-            .map((point) => LatLng(point['lat'], point['lng']))
-            .toList();
+        final List<LatLng> routePoints =
+            route.map((point) => LatLng(point['lat'], point['lng'])).toList();
 
         setState(() {
           _routePoints = routePoints;
           _markers.add(Marker(
             markerId: MarkerId(doc.id),
             position: _routePoints.first, // Marca el inicio de la ruta
-            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+            icon: BitmapDescriptor.defaultMarkerWithHue(
+                BitmapDescriptor.hueAzure),
           ));
 
           // Inicializa la animación para el autobús
@@ -93,7 +100,9 @@ class MapadeRutasState extends State<MapadeRutas> with TickerProviderStateMixin 
   Widget build(BuildContext context) {
     return GoogleMap(
       initialCameraPosition: CameraPosition(
-        target: _routePoints.isNotEmpty ? _routePoints.first : const LatLng(0.0, 0.0),
+        target: _routePoints.isNotEmpty
+            ? _routePoints.first
+            : const LatLng(0.0, 0.0),
         zoom: 12,
       ),
       onMapCreated: (controller) {

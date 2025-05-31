@@ -5,17 +5,18 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:nau/models/user.dart';
+import 'package:nau/services/auth/auth_services.dart';
 
 import 'dart:io';
 
 import 'package:nau/services/auth/database/database_provider.dart';
 import 'package:provider/provider.dart';
 
+import '../components/my_settings_tile.dart';
+
 class PerfilConfig extends StatefulWidget {
   final String userId;
-  final Map<String, dynamic> userData;
-
-  const PerfilConfig({super.key, required this.userId, required this.userData});
+  const PerfilConfig({super.key, required this.userId});
 
   @override
   PerfilConfigState createState() => PerfilConfigState();
@@ -27,13 +28,13 @@ class PerfilConfigState extends State<PerfilConfig> {
   String? _imageUrl;
   final _nameController = TextEditingController();
   final _lastNameController = TextEditingController();
-  final _bioController = TextEditingController();
   final _phoneNumberController = TextEditingController();
   final _birthDateController = TextEditingController();
 
   bool _hasUnsavedChanges = false;
 
   UserProfile? userData;
+
   late final databaseProvider =
       Provider.of<DatabaseProvider>(context, listen: false);
 
@@ -99,7 +100,6 @@ class PerfilConfigState extends State<PerfilConfig> {
       final updatedData = {
         'name': _nameController.text,
         'lastName': _lastNameController.text,
-        'bio': _bioController.text,
         'phoneNumber': _phoneNumberController.text,
       };
 
@@ -143,7 +143,6 @@ class PerfilConfigState extends State<PerfilConfig> {
         setState(() {
           _nameController.text = userData!.name;
           _lastNameController.text = userData!.lastName;
-          _bioController.text = userData!.bio;
           _phoneNumberController.text = userData!.phoneNumber;
           _birthDateController.text = userData?.birthDate != null
               ? (userData!.birthDate).toDate().toString().split(' ')[0]
@@ -230,7 +229,7 @@ class PerfilConfigState extends State<PerfilConfig> {
                                             (userData?.profilePic ?? '') != '')
                                         ? ClipOval(
                                             child: Image.network(
-                                              widget.userData['profilePic'],
+                                              userData?.profilePic ?? '',
                                               width: 150,
                                               height: 150,
                                               fit: BoxFit.cover,
@@ -249,7 +248,7 @@ class PerfilConfigState extends State<PerfilConfig> {
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        '@${widget.userData['username'] ?? 'usuario'}',
+                                        '@${userData?.username ?? 'usuario'}',
                                         style: TextStyle(
                                           fontWeight: FontWeight.bold,
                                           fontSize: 20,
@@ -259,7 +258,7 @@ class PerfilConfigState extends State<PerfilConfig> {
                                         ),
                                       ),
                                       Text(
-                                        widget.userData['name'] ??
+                                        userData?.name ??
                                             'Nombre real',
                                         style: TextStyle(
                                           fontSize: 18,
@@ -329,12 +328,11 @@ class PerfilConfigState extends State<PerfilConfig> {
                                                     .collection('Users')
                                                     .doc(widget.userId)
                                                     .update({'profilePic': ''});
-                                                setState(() {
+                                                setState(() async {
                                                   _imageFile = null;
                                                   _imageUrl = null;
-                                                  widget.userData[
-                                                      'profilePic'] = '';
                                                   _hasUnsavedChanges = true;
+                                                  await _loadUserData();
                                                 });
                                               },
                                             ),
@@ -359,26 +357,16 @@ class PerfilConfigState extends State<PerfilConfig> {
                             // Campo de nombre de usuario
                             TextField(
                               controller: _nameController,
-                              decoration: const InputDecoration(
-                                  labelText: 'Nombre'),
+                              decoration:
+                                  const InputDecoration(labelText: 'Nombre'),
                               onChanged: (_) => _hasUnsavedChanges = true,
                             ),
                             const SizedBox(height: 10),
                             // Campo de Apellidos
                             TextField(
                               controller: _lastNameController,
-                              decoration: const InputDecoration(
-                                  labelText: 'Apellidos'),
-                              onChanged: (_) => _hasUnsavedChanges = true,
-                            ),
-                            // Campo de bio
-                            TextField(
-                              controller: _bioController,
                               decoration:
-                                  const InputDecoration(labelText: 'Biografia'),
-                              minLines: 1,
-                              maxLines: 4,
-                              keyboardType: TextInputType.multiline,
+                                  const InputDecoration(labelText: 'Apellidos'),
                               onChanged: (_) => _hasUnsavedChanges = true,
                             ),
                             const SizedBox(height: 20),
@@ -398,9 +386,6 @@ class PerfilConfigState extends State<PerfilConfig> {
                               enabled: false,
                             ),
                             const SizedBox(height: 20),
-                            // Estado de descuento
-
-                            const SizedBox(height: 20),
                             // Botón para guardar cambios
                             ElevatedButton(
                               style: ElevatedButton.styleFrom(
@@ -412,6 +397,75 @@ class PerfilConfigState extends State<PerfilConfig> {
                               ),
                               onPressed: _updateProfile,
                               child: const Text('Guardar cambios'),
+                            ),
+                            const SizedBox(height: 20),
+                            // Botón para eliminar cuenta
+                            MySettingsTile(
+                              title: "Eliminar cuenta",
+                              action: IconButton(
+                                icon: const Icon(Icons.delete_forever,
+                                    color: Colors.red),
+                                onPressed: () async {
+                                  final authService = Provider.of<AuthService>(
+                                      context,
+                                      listen: false);
+
+                                  // Opcional: mostrar un diálogo de confirmación
+                                  final confirm = await showDialog<bool>(
+                                    context: context,
+                                    builder: (context) => AlertDialog(
+                                      title: const Text('¿Eliminar cuenta?'),
+                                      content: const Text(
+                                          'Esta acción no se puede deshacer. ¿Seguro que quieres eliminar tu cuenta?'),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.of(context).pop(false),
+                                          child: const Text('Cancelar'),
+                                        ),
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.of(context).pop(true),
+                                          child: const Text('Eliminar',
+                                              style:
+                                                  TextStyle(color: Colors.red)),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+
+                                  if (confirm == true) {
+                                    try {
+                                      await authService.deleteAccount();
+                                      if (!context.mounted) return;
+                                      // Cierra todas las rutas y navega al login
+                                      Navigator.of(context)
+                                          .pushNamedAndRemoveUntil(
+                                        '/login',
+                                        (Route<dynamic> route) => false,
+                                      );
+                                    } catch (e) {
+                                      // Muestra un mensaje de error si ocurre algo
+                                      if (context.mounted) {
+                                        showDialog(
+                                          context: context,
+                                          builder: (context) => AlertDialog(
+                                            title: const Text('Error'),
+                                            content: Text(e.toString()),
+                                            actions: [
+                                              TextButton(
+                                                onPressed: () =>
+                                                    Navigator.of(context).pop(),
+                                                child: const Text('OK'),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      }
+                                    }
+                                  }
+                                },
+                              ),
                             ),
                           ],
                         ),

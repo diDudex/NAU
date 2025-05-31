@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:nau/pages/mapa/mapade_rutas.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import 'package:geolocator/geolocator.dart';
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -28,31 +30,71 @@ class _HomeScreenState extends State<HomeScreen> {
       _mapVisible = false;
     });
 
-    // Solicita permisos de ubicación
+    // Solicita permisos de ubicación usando permission_handler
     final status = await Permission.location.request();
 
-    if (status.isGranted) {
-      // Simula la obtención de la ubicación
-      await Future.delayed(const Duration(seconds: 1));
-      if (mounted) {
-        setState(() {
-          _mapVisible = true;
-          _isLoadingLocation = false;
-        });
-      }
-      // Aquí podrías agregar lógica para centrar el mapa en la ubicación actual
-      // por ejemplo, usando un controlador de mapa y moviendo la cámara.
-      // Si usas Google Maps, necesitarás pasar el controlador al widget MapadeRutas
-      // y llamar a moveCamera o animateCamera con la ubicación obtenida.
-    } else {
-      // Si no se otorgan permisos, muestra el mapa como no disponible
+    if (!status.isGranted) {
       if (mounted) {
         setState(() {
           _mapVisible = false;
           _isLoadingLocation = false;
         });
       }
+      return;
     }
+
+    // Verifica si los servicios de ubicación están habilitados y permisos con geolocator
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      print('Los servicios de ubicación están deshabilitados.');
+      if (mounted) {
+        setState(() {
+          _mapVisible = false;
+          _isLoadingLocation = false;
+        });
+      }
+      return;
+    }
+
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        print('Permisos de ubicación denegados.');
+        if (mounted) {
+          setState(() {
+            _mapVisible = false;
+            _isLoadingLocation = false;
+          });
+        }
+        return;
+      }
+    }
+    if (permission == LocationPermission.deniedForever) {
+      print('Permisos de ubicación denegados permanentemente.');
+      if (mounted) {
+        setState(() {
+          _mapVisible = false;
+          _isLoadingLocation = false;
+        });
+      }
+      return;
+    }
+
+    // Si todo está bien, obtiene la ubicación
+    Position position = await Geolocator.getCurrentPosition(
+      desiredAccuracy: LocationAccuracy.high,
+    );
+    print('Latitud: ${position.latitude}, Longitud: ${position.longitude}');
+
+    if (mounted) {
+      setState(() {
+        _mapVisible = true;
+        _isLoadingLocation = false;
+      });
+    }
+    // Aquí podrías agregar lógica para centrar el mapa en la ubicación actual
+    
   }
 
   // Ejemplo de lista de camiones

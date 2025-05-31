@@ -36,91 +36,41 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
         //Body
         body: Column(
-            children: [
+          children: [
             MySettingsTile(
               title: "Cambiar tema",
               action: CupertinoSwitch(
-              onChanged: (value) =>
-                Provider.of<ThemeProvider>(context, listen: false)
-                  .toggleTheme(),
-              value: Provider.of<ThemeProvider>(context, listen: false)
-                .isDarkMode,
+                onChanged: (value) =>
+                    Provider.of<ThemeProvider>(context, listen: false)
+                        .toggleTheme(),
+                value: Provider.of<ThemeProvider>(context, listen: false)
+                    .isDarkMode,
+              ),
+            ),
+            MySettingsTile(
+              title: "Configuración de perfil",
+              action: IconButton(
+                icon: const Icon(Icons.settings),
+                onPressed: () {
+                  Navigator.of(context).pushNamed('/perfilconfig');
+                },
               ),
             ),
             MySettingsTile(
               title: "Salir de la cuenta",
               action: IconButton(
-              icon: const Icon(Icons.logout),
-              onPressed: () async {
-                final navigator = Navigator.of(context);
-                final authService =
-                  Provider.of<AuthService>(context, listen: false);
-                await authService.logout();
-                if (!mounted) return;
-                navigator.pushReplacementNamed('/login');
-              },
+                icon: const Icon(Icons.logout),
+                onPressed: () async {
+                  final navigator = Navigator.of(context);
+                  final authService =
+                      Provider.of<AuthService>(context, listen: false);
+                  await authService.logout();
+                  if (!mounted) return;
+                  navigator.pushReplacementNamed('/login');
+                },
               ),
             ),
-            MySettingsTile(
-              title: "Eliminar cuenta",
-              action: IconButton(
-              icon: const Icon(Icons.delete_forever, color: Colors.red),
-              onPressed: () async {
-                final authService =
-                  Provider.of<AuthService>(context, listen: false);
 
-                // Opcional: mostrar un diálogo de confirmación
-                final confirm = await showDialog<bool>(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: const Text('¿Eliminar cuenta?'),
-                  content: const Text(
-                    'Esta acción no se puede deshacer. ¿Seguro que quieres eliminar tu cuenta?'),
-                  actions: [
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(false),
-                    child: const Text('Cancelar'),
-                  ),
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(true),
-                    child: const Text('Eliminar',
-                      style: TextStyle(color: Colors.red)),
-                  ),
-                  ],
-                ),
-                );
-
-                if (confirm == true) {
-                try {
-                  await authService.deleteAccount();
-                  if (!context.mounted) return;
-                  // Cierra todas las rutas y navega al login
-                  Navigator.of(context).pushNamedAndRemoveUntil(
-                  '/login',
-                  (Route<dynamic> route) => false,
-                  );
-                } catch (e) {
-                  // Muestra un mensaje de error si ocurre algo
-                  if (context.mounted) {
-                  showDialog(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                    title: const Text('Error'),
-                    content: Text(e.toString()),
-                    actions: [
-                      TextButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('OK'),
-                      ),
-                    ],
-                    ),
-                  );
-                  }
-                }
-                }
-              },
-              ),
-            ),
           ],
         ));
   }

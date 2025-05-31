@@ -13,9 +13,8 @@ import 'package:open_filex/open_filex.dart';
 
 class DocumentPage extends StatefulWidget {
   final String userId;
-  final Map<String, dynamic> userData;
 
-  const DocumentPage({super.key, required this.userId, required this.userData});
+  const DocumentPage({super.key, required this.userId});
 
   @override
   State<DocumentPage> createState() => _DocumentPageState();

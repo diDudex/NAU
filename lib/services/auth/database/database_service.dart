@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:nau/models/user.dart';
-import 'package:nau/services/auth/auth_services.dart';
 
 import '../../../models/documents.dart';
 

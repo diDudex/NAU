@@ -54,7 +54,6 @@ class _MapaScreenState extends State<MapaScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Mapa del usuario")),
       body: GoogleMap(
         initialCameraPosition: CameraPosition(
           target: _initialPosition,

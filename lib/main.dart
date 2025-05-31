@@ -1,7 +1,9 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:nau/pages/document_page.dart';
 import 'package:nau/pages/login.dart';
 import 'package:nau/pages/perfilconfig.dart';
+import 'package:nau/pages/seleccion.dart';
 import 'package:nau/services/auth/auth_gate.dart';
 import 'package:nau/firebase_options.dart';
 import 'package:nau/services/auth/database/database_provider.dart';
@@ -24,7 +26,8 @@ void main() async {
     MultiProvider(
       providers: [
         // Servicio de autenticación
-        Provider<AuthService>(create: (_) => AuthService(),
+        Provider<AuthService>(
+          create: (_) => AuthService(),
         ),
         // Tema provider
         ChangeNotifierProvider(create: (context) => ThemeProvider()),
@@ -51,6 +54,11 @@ class MainApp extends StatelessWidget {
           final userId = AuthService().getCurrentUid();
           return PerfilConfig(userId: userId);
         },
+        '/document_page': (context) {
+          final userId = AuthService().getCurrentUid();
+          return DocumentPage(userId: userId);
+        },
+        "/seleccion": (context) => const SeatSelectionScreen(),
       },
       theme: Provider.of<ThemeProvider>(context).themeData,
     );

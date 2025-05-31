@@ -2,7 +2,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:nau/models/documents.dart';
 import 'package:nau/models/user.dart';
-import 'package:nau/services/auth/auth_services.dart';
 import 'package:nau/services/auth/database/database_service.dart';
 
 import '../../../models/ruta.dart';

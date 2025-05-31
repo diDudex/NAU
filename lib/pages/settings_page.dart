@@ -57,6 +57,15 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             ),
             MySettingsTile(
+              title: "Validacion de Documentos",
+              action: IconButton(
+                icon: const Icon(Icons.upload_file),
+                onPressed: () {
+                  Navigator.of(context).pushNamed('/document_page');
+                },
+              ),
+            ),
+            MySettingsTile(
               title: "Salir de la cuenta",
               action: IconButton(
                 icon: const Icon(Icons.logout),

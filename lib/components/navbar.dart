@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import '../pages/mapa/RouteEditorScreen.dart';
 import '../pages/home.dart';
-import '../pages/profile_screen.dart';
 import '../pages/settings_page.dart';
 import '../pages/walletscreen.dart';
 import '../services/auth/auth_services.dart';
@@ -20,8 +18,6 @@ class _MainNavigationState extends State<MainNavigation> {
   List<Widget> get _screens => [
     const HomeScreen(),
     const Walletscreen(),
-    const RouteEditorScreen(),
-    PerfilScreen(uid: currentUid),
     const SettingsPage(),
   ];
 
@@ -49,14 +45,6 @@ class _MainNavigationState extends State<MainNavigation> {
           BottomNavigationBarItem(
             icon: Icon(Icons.account_balance_wallet),
             label: 'Cartera',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.route),
-            label: 'Rutas',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'Perfil',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.settings),

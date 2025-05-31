@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:nau/pages/confirmacionboleto.dart';
 import 'package:nau/widgets/ticketw.dart';
 import '../models/boleto.dart';
 
@@ -70,7 +69,10 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
             ),
             const SizedBox(height: 20),
             ElevatedButton(
-              
+              style: TextButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+                foregroundColor: Theme.of(context).colorScheme.onPrimary,
+              ),
               onPressed: selectedSeat != null
                   ? () {
                       final boleto = Boleto(

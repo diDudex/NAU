@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:nau/pages/document_page.dart';
 import 'package:nau/pages/login.dart';
 import 'package:nau/pages/perfilconfig.dart';
-import 'package:nau/pages/seleccion.dart';
 import 'package:nau/services/auth/auth_gate.dart';
 import 'package:nau/firebase_options.dart';
 import 'package:nau/services/auth/database/database_provider.dart';
@@ -58,7 +57,6 @@ class MainApp extends StatelessWidget {
           final userId = AuthService().getCurrentUid();
           return DocumentPage(userId: userId);
         },
-        "/seleccion": (context) => const SeatSelectionScreen(),
       },
       theme: Provider.of<ThemeProvider>(context).themeData,
     );

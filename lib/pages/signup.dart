@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:nau/controller/date_selector.dart';
 import 'package:nau/services/auth/auth_services.dart';
 import 'package:nau/services/auth/database/database_service.dart';
 
@@ -56,12 +58,13 @@ class _SignupState extends State<Signup> {
   int? selectedMonth;
   int? selectedYear;
 
-  final List<int> days = List.generate(31, (i) => i + 1);
-  final List<int> months = List.generate(12, (i) => i + 1);
-  final List<int> years = List.generate(
-    DateTime.now().year - 1899,
-    (i) => 1900 + i,
-  );
+  static const emailRegex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$';
+  static const nameRegex = r'^[a-zA-Z\sáéíóúÁÉÍÓÚñÑ]+$'; // Permite acentos y ñ
+  static const phoneRegex = r'^[0-9]{10,}$'; // Exactamente 10+ dígitos
+  static const minPasswordLength = 9;
+  static const minAge = 13; // Edad mínima requerida
+  static const maxAge = 120; // Edad máxima razonable
+
 
   @override
   void initState() {
@@ -79,6 +82,20 @@ class _SignupState extends State<Signup> {
     selectedYear = int.tryParse(yearController.text);
   }
 
+  @override
+  void dispose() {
+    nameController.dispose();
+    lastNameController.dispose();
+    emailController.dispose();
+    pwController.dispose();
+    confirmPwController.dispose();
+    phoneController.dispose();
+    dayController.dispose();
+    monthController.dispose();
+    yearController.dispose();
+    super.dispose();
+  }
+
   Future<bool> _showError(String message) async {
     await showDialog(
       context: context,
@@ -87,140 +104,98 @@ class _SignupState extends State<Signup> {
     return false;
   }
 
-  /// Valida los campos del formulario de registro.
-  ///
-  /// Realiza las siguientes validaciones:
-  ///
-  /// - **Fecha de nacimiento**:
-  ///   - Verifica que los campos de día, mes y año no estén vacíos.
-  ///   - Asegura que los valores sean numéricos y que el año tenga 4 dígitos.
-  ///   - Comprueba que la fecha sea válida, tenga sentido (por ejemplo, no sea futura, ni anterior a 1900, ni que la edad supere los 120 años).
-  ///
-  /// - **Correo electrónico**:
-  ///   - Verifica que no esté vacío.
-  ///   - Valida el formato del correo usando una expresión regular.
-  ///
-  /// - **Nombre**:
-  ///   - Verifica que no esté vacío.
-  ///   - Solo permite letras y espacios (sin caracteres especiales).
-  ///
-  /// - **Teléfono**:
-  ///   - Verifica que no esté vacío.
-  ///   - Solo permite dígitos numéricos.
-  ///   - Debe tener al menos 10 dígitos.
-  ///
-  /// - **Contraseña**:
-  ///   - Verifica que no esté vacía.
-  ///   - Debe tener al menos 9 caracteres.
-  ///
-  /// Si alguna validación falla, muestra un mensaje de error y retorna `false`.
-  /// Si todas las validaciones son correctas, retorna `true`.
-  Future<bool> _validateInputs() async {
-    const int minYearAllowed = 1900;
-    const int maxAgeAllowed = 120;
+  bool _isValidBirthDate(int day, int month, int year) {
+    try {
+      final date = DateTime(year, month, day);
+      final now = DateTime.now();
+      final age = now.year -
+          year -
+          ((now.month < month || (now.month == month && now.day < day))
+              ? 1
+              : 0);
 
-    bool isValidDate(int year, int month, int day) {
-      try {
-        final date = DateTime(year, month, day);
-        final now = DateTime.now();
-        final age = now.year -
-            date.year -
-            ((now.month < date.month ||
-                    (now.month == date.month && now.day < date.day))
-                ? 1
-                : 0);
-        return date.year == year &&
-            date.month == month &&
-            date.day == day &&
-            year >= minYearAllowed &&
-            year <= now.year &&
-            age <= maxAgeAllowed &&
-            date.isBefore(now);
-      } catch (_) {
-        return false;
-      }
+      return date.year == year &&
+          date.month == month &&
+          date.day == day &&
+          year >= 1900 &&
+          age >= minAge &&
+          age <= maxAge &&
+          date.isBefore(now);
+    } catch (_) {
+      return false;
     }
+  }
 
-    // Validar que se haya seleccionado la fecha correctamente
+  // Validar los campos de entrada
+  Future<bool> _validateInputs() async {
+    // Validación de fecha
     if (selectedDay == null || selectedMonth == null || selectedYear == null) {
       return await _showError("Por favor selecciona una fecha válida");
     }
 
-    final day = selectedDay!;
-    final month = selectedMonth!;
-    final year = selectedYear!;
-
-    if (!isValidDate(year, month, day)) {
+    if (!_isValidBirthDate(selectedDay!, selectedMonth!, selectedYear!)) {
       return await _showError(
-          "¡La fecha de nacimiento no es válida o no tiene sentido!");
+          "Debes tener al menos $minAge años para registrarte");
     }
 
-    // Validación del correo
+    // Validación de nombre
+    if (nameController.text.isEmpty || lastNameController.text.isEmpty) {
+      return await _showError("Nombre y apellido son obligatorios");
+    }
+
+    if (!RegExp(nameRegex).hasMatch(nameController.text) ||
+        !RegExp(nameRegex).hasMatch(lastNameController.text)) {
+      return await _showError(
+          "Nombre y apellido solo pueden contener letras y espacios");
+    }
+
+    // Validación de email
     if (emailController.text.isEmpty) {
-      return await _showError("¡El correo no puede estar vacío!");
-    }
-    if (!RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
-        .hasMatch(emailController.text)) {
-      return await _showError("¡El correo no tiene un formato válido!");
+      return await _showError("El correo es obligatorio");
     }
 
-    // Validación del nombre
-    if (nameController.text.isEmpty) {
-      return await _showError("¡El nombre no puede estar vacío!");
-    }
-    if (!RegExp(r'^[a-zA-Z\s]+$').hasMatch(nameController.text)) {
-      return await _showError(
-          "¡El nombre no puede contener caracteres especiales!");
+    if (!RegExp(emailRegex).hasMatch(emailController.text)) {
+      return await _showError("Ingresa un correo electrónico válido");
     }
 
-    // Validación del teléfono
+    // Validación de teléfono
     if (phoneController.text.isEmpty) {
-      return await _showError("¡El número de teléfono no puede estar vacío!");
-    }
-    if (!RegExp(r'^[0-9]+$').hasMatch(phoneController.text)) {
-      return await _showError(
-          "¡El número de teléfono solo puede contener dígitos!");
-    }
-    if (phoneController.text.length < 10) {
-      return await _showError(
-          "¡El número de teléfono debe tener al menos 10 dígitos!");
+      return await _showError("El teléfono es obligatorio");
     }
 
-    // Validación de la contraseña
-    if (pwController.text.isEmpty) {
-      return await _showError("¡La contraseña no puede estar vacía!");
+    if (!RegExp(phoneRegex).hasMatch(phoneController.text)) {
+      return await _showError("El teléfono debe tener al menos 10 dígitos");
     }
-    if (pwController.text.length < 9) {
+
+    // Validación de contraseña
+    if (pwController.text.length < minPasswordLength) {
       return await _showError(
-          "¡La contraseña debe tener al menos 9 caracteres!");
+          "La contraseña debe tener al menos $minPasswordLength caracteres");
+    }
+
+    if (pwController.text != confirmPwController.text) {
+      return await _showError("Las contraseñas no coinciden");
     }
 
     return true;
   }
 
-  //funcion para registrar al usuario
-  //esta funcion se encarga de registrar al usuario en firebase
-  //y guardar su informacion en la base de datos
-  //si el registro es exitoso, lo lleva a la pantalla de inicio
-  //si el registro falla, muestra un mensaje de error
-  //si el usuario ya tiene cuenta, lo lleva a la pantalla de inicio de sesion
+  // Funcion para registrar al usuario
   void register() async {
-    if (pwController.text != confirmPwController.text) {
-      await _showError("¡Las contraseñas no coinciden!");
-      return;
-    }
-
-    if (!await _validateInputs()) return;
-
     showLoadingCircle(context);
 
     try {
-      await _auth.registerEmailPassword(
+      // Validar primero
+      if (!await _validateInputs()) {
+        if (mounted) hideLoadingCircle(context);
+        return;
+      }
+
+      // Registrar usuario
+      final userCredential = await _auth.registerEmailPassword(
           emailController.text, pwController.text);
 
-      if (mounted) hideLoadingCircle(context);
-
-      // Convertir fecha para guardar usando variables seleccionadas
+      // Guardar información adicional
       final birthDate = DateTime(selectedYear!, selectedMonth!, selectedDay!);
 
       await _db.saveUserInfoInFirebase(
@@ -230,9 +205,30 @@ class _SignupState extends State<Signup> {
         phoneNumber: phoneController.text,
         birthDate: Timestamp.fromDate(birthDate),
       );
+
+      if (mounted) hideLoadingCircle(context);
+    } on FirebaseAuthException catch (e) {
+      if (mounted) hideLoadingCircle(context);
+      String message;
+
+      switch (e.code) {
+        case 'email-already-in-use':
+          message = "Este correo ya está registrado";
+          break;
+        case 'weak-password':
+          message = "La contraseña es muy débil";
+          break;
+        case 'invalid-email':
+          message = "Correo electrónico inválido";
+          break;
+        default:
+          message = "Error de autenticación: ${e.message}";
+      }
+
+      await _showError(message);
     } catch (e) {
       if (mounted) hideLoadingCircle(context);
-      await _showError(e.toString());
+      await _showError("Ocurrió un error inesperado");
     }
   }
 
@@ -252,7 +248,7 @@ class _SignupState extends State<Signup> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.start,
                 children: [
-                  const SizedBox(height: 100.0),
+                  const SizedBox(height: 70),
                   //logo
                   Icon(
                     Icons.directions_bus,
@@ -260,7 +256,7 @@ class _SignupState extends State<Signup> {
                     color: Theme.of(context).colorScheme.inversePrimary,
                   ),
 
-                  const SizedBox(height: 50.0),
+                  const SizedBox(height: 30.0),
                   //mensaje de crea tu cuenta
                   Text(
                     "¡Crea tu propia cuenta ahora mismo!",
@@ -271,124 +267,67 @@ class _SignupState extends State<Signup> {
                     ),
                   ),
                   //user-name textfield
-                  const SizedBox(height: 50.0),
+                  const SizedBox(height: 25),
                   MyTextField(
                       controller: nameController,
                       hintText: "Escribe tu nombre...",
                       obscureText: false),
-                  const SizedBox(height: 50.0),
+                  const SizedBox(height: 25),
                   //user-lastname textfield
                   MyTextField(
                       controller: lastNameController,
                       hintText: "Escribe tus apellidos...",
                       obscureText: false),
-                  const SizedBox(height: 50.0),
+                  const SizedBox(height: 25),
                   //user-email textfield
                   MyTextField(
                       controller: emailController,
                       hintText: "Ingresa tu e-mail...",
                       obscureText: false),
-                  const SizedBox(height: 50.0),
+                  const SizedBox(height: 25),
                   //password textfield
                   MyTextField(
                     controller: pwController,
                     hintText: "Ingresa tu contraseña...",
                     obscureText: true,
                   ),
-                  const SizedBox(height: 50.0),
+                  const SizedBox(height: 25),
                   //confirm password textfield
                   MyTextField(
                     controller: confirmPwController,
                     hintText: "Confirma tu contraseña...",
                     obscureText: true,
                   ),
-                  const SizedBox(height: 50.0),
+                  const SizedBox(height: 25),
                   //phone number textfield
                   MyTextField(
                     controller: phoneController,
                     hintText: "Ingresa tu número de teléfono...",
                     obscureText: false,
                   ),
-                  const SizedBox(height: 50.0),
+                  const SizedBox(height: 25),
                   // fecha de nacimiento
-                  SizedBox(
-                    width: double.infinity,
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: DropdownButtonFormField<int>(
-                            decoration: const InputDecoration(
-                              labelText: 'Día',
-                              border: OutlineInputBorder(),
-                            ),
-                            value: selectedDay,
-                            items: days
-                                .map((day) => DropdownMenuItem(
-                                      value: day,
-                                      child: Text(day.toString()),
-                                    ))
-                                .toList(),
-                            onChanged: (value) {
-                              setState(() {
-                                selectedDay = value;
-                                dayController.text = value.toString();
-                              });
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: DropdownButtonFormField<int>(
-                            decoration: const InputDecoration(
-                              labelText: 'Mes',
-                              border: OutlineInputBorder(),
-                            ),
-                            value: selectedMonth,
-                            items: months
-                                .map((month) => DropdownMenuItem(
-                                      value: month,
-                                      child: Text(month.toString()),
-                                    ))
-                                .toList(),
-                            onChanged: (value) {
-                              setState(() {
-                                selectedMonth = value;
-                                monthController.text = value.toString();
-                              });
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: DropdownButtonFormField<int>(
-                            decoration: const InputDecoration(
-                              labelText: 'Año',
-                              border: OutlineInputBorder(),
-                            ),
-                            value: selectedYear,
-                            items: years
-                                .map((year) => DropdownMenuItem(
-                                      value: year,
-                                      child: Text(year.toString()),
-                                    ))
-                                .toList(),
-                            onChanged: (value) {
-                              setState(() {
-                                selectedYear = value;
-                                yearController.text = value.toString();
-                              });
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
+                  DateSelector(
+                    onDateChanged: (date) {
+                      setState(() {
+                        selectedDay = date.day;
+                        selectedMonth = date.month;
+                        selectedYear = date.year;
+                        // Actualiza los controladores si los necesitas para otra cosa
+                        dayController.text = date.day.toString();
+                        monthController.text = date.month.toString();
+                        yearController.text = date.year.toString();
+                      });
+                    },
+                    initialDate: DateTime(selectedYear ?? 2000,
+                        selectedMonth ?? 1, selectedDay ?? 1),
                   ),
-                  const SizedBox(height: 50.0),
+                  const SizedBox(height: 25),
 
                   //continuar con el registro button
                   MyButton(text: "Continuar", onTap: register),
 
-                  const SizedBox(height: 50.0),
+                  const SizedBox(height: 20.0),
                   //ya tienes cuenta? inicia sesion
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,

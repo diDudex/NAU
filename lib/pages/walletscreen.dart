@@ -25,7 +25,13 @@ class Walletscreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Monedero Electrónico'),
+        title: const Text(
+          'Monedero Electrónico',
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         centerTitle: true,
       ),
       body: Padding(
@@ -38,40 +44,59 @@ class Walletscreen extends StatelessWidget {
             ),
             const SizedBox(height: 12),
 
-            // Tarjeta visual
-            Container(
-              height: 150,
-              decoration: BoxDecoration(
-                color: Colors.grey[400],
-                borderRadius: BorderRadius.circular(16),
-              ),
-              padding: const EdgeInsets.all(20),
-              child: Row(
-                children: [
-                  Image.asset(
-                    'assets/bus_card.png', // Asegúrate de tener esta imagen
-                    width: 80,
-                    height: 80,
+            // Tarjeta visual con fondo blanco detrás de la imagen
+            SizedBox(
+              width: double.infinity,
+              height: 270,
+              child: Stack(
+              alignment: Alignment.center,
+              children: [
+                // Fondo blanco con bordes redondeados
+                Container(
+                width: 350,
+                height: 200,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.wifi, size: 32),
-                        const SizedBox(height: 8),
-                        Text(
-                          '\$${saldo.toStringAsFixed(2)}',
-                          style: const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        )
-                      ],
-                    ),
-                  )
-                ],
+                  ],
+                ),
+                ),
+                ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Image.asset(
+                  'assets/NAUCard.png',
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                ),
+                ),
+                // Saldo encima de la tarjeta
+                Positioned(
+                bottom: 40,
+                right: 35,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.6),
+                  borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                  '\$${saldo.toStringAsFixed(2)}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  ),
+                ),
+                ),
+              ],
               ),
             ),
 

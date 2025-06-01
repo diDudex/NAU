@@ -31,7 +31,12 @@ class _SettingsPageState extends State<SettingsPage> {
         //AppBar
         appBar: AppBar(
           centerTitle: true,
-          title: const Text("Ajustes"),
+          title: const Text("Ajustes",
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+          ),
+          ),
           foregroundColor: Theme.of(context).colorScheme.inversePrimary,
         ),
         //Body

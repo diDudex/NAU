@@ -4,9 +4,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
+import '../models/boleto.dart';
 
 class TicketW extends StatefulWidget {
-  const TicketW({super.key});
+  final List<Boleto> boletos;
+  final String busRouteId;
+  final VoidCallback onTicketPurchased;
+
+  const TicketW({
+    super.key,
+    required this.boletos,
+    required this.busRouteId,
+    required this.onTicketPurchased,
+  });
 
   @override
   State<TicketW> createState() => _TicketWState();
@@ -14,128 +25,363 @@ class TicketW extends StatefulWidget {
 
 class _TicketWState extends State<TicketW> {
   final GlobalKey _ticketKey = GlobalKey();
-  int cantidad = 1;
-  bool comprado = false;
-  Uint8List? ticketImage;
+  bool _comprado = false;
+  Uint8List? _ticketImage;
+  bool _guardando = false;
+  double _total = 0.0;
+  List<String> _boletosIds = []; // Almacena los IDs de los boletos
+  bool _shouldRefresh = false;
 
-  final double precioUnitario = 20.0;
-  final double descuentoFijo = 5.0;
-  final double impuestosFijos = 2.0;
+  @override
+  void initState() {
+    super.initState();
+    _total = widget.boletos.fold(0.0, (sum, boleto) => sum + boleto.precio);
+  }
+
+  @override
+  void dispose() {
+    if (_shouldRefresh) {
+      widget.onTicketPurchased();
+    }
+    super.dispose();
+  }
+
+  Future<bool> _onWillPop() async {
+    if (_shouldRefresh) {
+      widget.onTicketPurchased();
+    }
+    return true;
+  }
 
   @override
   Widget build(BuildContext context) {
-    final double subtotal = precioUnitario * cantidad;
-    final double impuestos = impuestosFijos;
-    final double descuento = descuentoFijo;
-    final double total = (subtotal + impuestos) - descuento;
+    final dateFormat = DateFormat('dd/MM/yyyy HH:mm');
+    final firstBoleto = widget.boletos.first;
 
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          if (ticketImage != null)
-            Image.memory(ticketImage!)
-          else
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                RepaintBoundary(
-                  key: _ticketKey,
-                  child: Container(
-                    color: Colors.white,
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        const Text(
-                          "TICKET DE COMPRA",
-                          textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+    return WillPopScope(
+      onWillPop: _onWillPop,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(widget.boletos.length == 1
+              ? 'Tu Boleto'
+              : 'Tus Boletos (${widget.boletos.length})'),
+          centerTitle: true,
+          actions: [
+            if (_comprado)
+              IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () => Navigator.pop(context, true),
+              ),
+          ],
+        ),
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              RepaintBoundary(
+                key: _ticketKey,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.onPrimary,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.grey.withOpacity(0.3),
+                        spreadRadius: 2,
+                        blurRadius: 5,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    children: [
+                      Text(
+                        widget.boletos.length == 1
+                            ? "BOLETO DE AUTOBÚS"
+                            : "BOLETOS DE AUTOBÚS",
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue,
                         ),
-                        const SizedBox(height: 16),
-                        QrImageView(
-                          data: 'ticket_id_urbanos_12',
-                          size: 300,
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        dateFormat.format(firstBoleto.fecha),
+                        style: const TextStyle(
+                          fontSize: 16,
+                          color: Colors.grey,
                         ),
-                        const SizedBox(height: 20),
-                        infoText("Nombre", "Urbanos"),
-                        infoText("Número de camión", "12"),
-                        infoText("Ruta", "Angostura-Guamuchil"),
-                        infoText("Destino", "Guamuchil"),
-                        infoText("Cantidad", "$cantidad"),
-                        const SizedBox(height: 10),
-                        const Divider(),
-                        infoText("Subtotal", "\$${subtotal.toStringAsFixed(2)}"),
-                        infoText("Impuestos", "\$${impuestos.toStringAsFixed(2)}"),
-                        infoText("Descuento", "-\$${descuento.toStringAsFixed(2)}"),
-                        const SizedBox(height: 10),
-                        Text(
-                          "Total: \$${total.toStringAsFixed(2)}",
-                          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 20),
+                      // QR que cambia según el estado de compra
+                      _comprado
+                          ? QrImageView(
+                              data: 'boleto_${_boletosIds.join('_')}',
+                              size: 200,
+                              backgroundColor: Colors.white,
+                            )
+                          : Column(
+                              children: [
+                                Container(
+                                  width: 200,
+                                  height: 200,
+                                  color: Colors.grey[200],
+                                  child: const Center(
+                                    child: Text(
+                                      'QR disponible\ndespués de la compra',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                const Text(
+                                  'El QR se habilitará después del pago',
+                                  style: TextStyle(
+                                    color: Colors.grey,
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                                ),
+                              ],
+                            ),
+                      const SizedBox(height: 20),
+                      _buildInfoRow('Ruta:', firstBoleto.ruta),
+                      _buildInfoRow('Hora:', firstBoleto.hora),
+                      Container(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        decoration: BoxDecoration(
+                          border: Border.symmetric(
+                            horizontal:
+                                BorderSide(color: Colors.grey.shade300),
+                          ),
                         ),
-                      ],
-                    ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Asientos:',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 5),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 4,
+                              children: widget.boletos
+                                  .map((boleto) => Chip(
+                                        label: Text('${boleto.asiento}'),
+                                        backgroundColor: _comprado
+                                            ? Colors.blue
+                                            : Colors.blue.withOpacity(0.5),
+                                      ))
+                                  .toList(),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Total (${widget.boletos.length} boleto${widget.boletos.length > 1 ? 's' : ''}):',
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Text(
+                              '\$${_total.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        _comprado
+                            ? 'Presentar este boleto al abordar'
+                            : 'Complete la compra para habilitar el boleto',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 20),
-                if (!comprado)
-                  Center(
-                    child: ElevatedButton(
-                      onPressed: () async {
-                        await FirebaseFirestore.instance.collection('tickets').add({
-                          'nombre': 'Urbanos',
-                          'numeroCamion': 12,
-                          'ruta': 'Angostura-Guamuchil',
-                          'destino': 'Guamuchil',
-                          'cantidad': cantidad,
-                          'subtotal': subtotal,
-                          'impuestos': impuestos,
-                          'descuento': descuento,
-                          'total': total,
-                          'fecha': DateTime.now(),
-                        });
-                        setState(() => comprado = true);
-                      },
-                      child: const Text('Comprar'),
+              ),
+              const SizedBox(height: 30),
+              if (!_comprado)
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 15),
+                      backgroundColor: Colors.blue,
                     ),
-                  )
-                else
-                  Center(
-                    child: ElevatedButton.icon(
-                      icon: const Icon(Icons.image),
-                      label: const Text('Mostrar Boleto'),
-                      onPressed: generarImagenTicket,
-                    ),
+                    onPressed: _guardando ? null : _comprarBoletos,
+                    child: _guardando
+                        ? const CircularProgressIndicator(
+                            color: Colors.white)
+                        : Text(
+                            'Confirmar ${widget.boletos.length} Boleto${widget.boletos.length > 1 ? 's' : ''}',
+                            style: TextStyle(
+                              fontSize: 18,
+                              color:
+                                  Theme.of(context).colorScheme.onPrimary,
+                            ),
+                          ),
                   ),
-              ],
+                )
+              else
+                Column(
+                  children: [
+                    const Icon(Icons.check_circle,
+                        color: Colors.green, size: 50),
+                    const SizedBox(height: 10),
+                    Text(
+                      '¡${widget.boletos.length} Boleto${widget.boletos.length > 1 ? 's' : ''} comprado${widget.boletos.length > 1 ? 's' : ''} exitosamente!',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        icon: const Icon(Icons.download),
+                        label: const Text('Guardar Boleto(s)'),
+                        onPressed: _generarImagenTicket,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    TextButton(
+                      child: const Text('Volver a la lista de rutas'),
+                      onPressed: () => Navigator.pop(context, true),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _comprarBoletos() async {
+    setState(() {
+      _guardando = true;
+      _shouldRefresh = true; // Marcar para refrescar al salir
+    });
+
+    try {
+      final batch = FirebaseFirestore.instance.batch();
+      final ticketsRef = FirebaseFirestore.instance.collection('Boletos');
+      _boletosIds = []; // Resetear IDs
+
+      for (final boleto in widget.boletos) {
+        final docRef = ticketsRef.doc(); // Generar ID único
+        _boletosIds.add(docRef.id); // Guardar ID
+
+        batch.set(docRef, {
+          'id': docRef.id, // Incluir ID en el documento
+          'ruta': boleto.ruta,
+          'asiento': boleto.asiento,
+          'fecha': boleto.fecha,
+          'hora': boleto.hora,
+          'precio': boleto.precio,
+          'fechaCompra': FieldValue.serverTimestamp(),
+          'estado': 'activo',
+          'rutaId': widget.busRouteId,
+          'qrData': 'boleto_${docRef.id}', // Datos para el QR
+        });
+      }
+
+      // Actualizar asientos ocupados
+      final routeRef = FirebaseFirestore.instance
+          .collection('busRoutes')
+          .doc(widget.busRouteId);
+
+      batch.update(routeRef, {
+        'occupiedSeats': FieldValue.arrayUnion(
+            widget.boletos.map((b) => b.asiento).toList()),
+      });
+
+      await batch.commit();
+      widget.onTicketPurchased();
+
+      if (mounted) {
+        setState(() {
+          _comprado = true;
+          _guardando = false;
+        });
+        await _generarImagenTicket();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _guardando = false;
+          _boletosIds = [];
+          _shouldRefresh = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al comprar: $e')),
+        );
+      }
+    }
+  }
+
+  Widget _buildInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
             ),
+          ),
+          Text(
+            value,
+            style: const TextStyle(fontSize: 16),
+          ),
         ],
       ),
     );
   }
 
-  Widget infoText(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Text(
-        "$label: $value",
-        style: const TextStyle(fontSize: 20),
-      ),
-    );
-  }
-
-  Future<void> generarImagenTicket() async {
+  Future<void> _generarImagenTicket() async {
     try {
-      RenderRepaintBoundary boundary = _ticketKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
-      ui.Image image = await boundary.toImage(pixelRatio: 3.0);
-      ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-      Uint8List pngBytes = byteData!.buffer.asUint8List();
+      final boundary = _ticketKey.currentContext!.findRenderObject()
+          as RenderRepaintBoundary;
+      final image = await boundary.toImage(pixelRatio: 3.0);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      final pngBytes = byteData!.buffer.asUint8List();
 
-      setState(() {
-        ticketImage = pngBytes;
-      });
+      setState(() => _ticketImage = pngBytes);
     } catch (e) {
       debugPrint("Error al generar imagen del ticket: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error al generar imagen del boleto')),
+      );
     }
   }
 }

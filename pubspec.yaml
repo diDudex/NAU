@@ -46,3 +46,5 @@ flutter:
   uses-material-design: true
   assets:
     - assets/bus_card.png
+    - assets/NAUCard.png
+    - assets/Bus.png

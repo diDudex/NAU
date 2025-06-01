@@ -8,13 +8,8 @@ import '../../../models/documents.dart';
   Servicios de la base de datos
     Esta clase maneja todos los datos desde y hacia Firebase.
     --------------------------------------------------------------------------------
-    -User profile
-    - Publicaciones (post)
-    - Likes
-    - Comentarios
-    - Seguidores/seguidos
-    - Usuarios buscados
-    - Cosas de la cuenta (reportes/bloqueos/cuenta/eliminar cuenta)
+    - User profile
+    - Documentos del usuario
 */
 class DatabaseService {
 //obtiene la instancia de firestore db y auth

@@ -9,12 +9,12 @@ import 'package:flutter/material.dart';
     - sugerencias (ejemplo: "Escribe tu nombre")
     - ocultar contraseña (ejemplo: ********)
 */
-class MyTextField extends StatefulWidget {
+class MyTextField extends StatelessWidget {
   final TextEditingController controller;
   final String hintText;
   final bool obscureText;
   final TextInputType? keyboardType;
-
+  
   const MyTextField({
     super.key,
     required this.controller,
@@ -24,34 +24,14 @@ class MyTextField extends StatefulWidget {
   });
 
   @override
-  State<MyTextField> createState() => _MyTextFieldState();
-}
-
-class _MyTextFieldState extends State<MyTextField> {
-  //construccion de la interfaz
-  @override
   Widget build(BuildContext context) {
-    //TextField
-    return TextField(
-      controller: widget.controller,
-      obscureText: widget.obscureText,
-      keyboardType: widget.keyboardType,
+    return TextFormField( // Cambia TextField a TextFormField
+      controller: controller,
+      obscureText: obscureText,
+      keyboardType: keyboardType,
       decoration: InputDecoration(
-        //borde cuando no esta seleccionado
-        enabledBorder: OutlineInputBorder(
-          borderSide:
-              BorderSide(color: Theme.of(context).colorScheme.inversePrimary),
-          borderRadius: BorderRadius.circular(10.0),
-        ),
-        //borde cuando esta seleccionado
-        focusedBorder: OutlineInputBorder(
-          borderSide: BorderSide(color: Theme.of(context).colorScheme.primary),
-          borderRadius: BorderRadius.circular(10.0),
-        ),
-        fillColor: Theme.of(context).colorScheme.tertiary,
-        filled: true,
-        hintText: widget.hintText,
-        hintStyle: TextStyle(color: Theme.of(context).colorScheme.primary),
+        hintText: hintText,
+        border: const OutlineInputBorder(),
       ),
     );
   }

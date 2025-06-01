@@ -26,17 +26,9 @@ import '../../ruta_database_service.dart';
 */
 
 class DatabaseProvider extends ChangeNotifier {
-  /*
-  Services
-
-  */
 
   //obtener db y auth services
   final _db = DatabaseService();
-  /*
-  Perfil de usuario
-
-  */
 
   //obtener el perfil del usuario actual por su uid
   Future<UserProfile?> userProfile(String uid, ) => _db.getUserFromFirebase(uid);

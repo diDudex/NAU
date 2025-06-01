@@ -10,44 +10,30 @@ import 'package:flutter/material.dart';
 
 */
 
-class MyButton extends StatefulWidget {
+class MyButton extends StatelessWidget {
   final String text;
-  final void Function()? onTap;
-
+  final VoidCallback onTap;
+  
   const MyButton({
     super.key,
     required this.text,
     required this.onTap,
-    
-    });
+  });
 
   @override
-  State<MyButton> createState() => _MyButtonState();
-}
-
-class _MyButtonState extends State<MyButton> {
-  @override
-  //construccion del boton
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: widget.onTap,
-      child: Container(
-        //padding del boton
-        padding: const EdgeInsets.symmetric(vertical: 20),
-        decoration: BoxDecoration(
-          //color del boton
-          color: Theme.of(context).colorScheme.secondary,
-          //bordes redondeados
-          borderRadius: BorderRadius.circular(10.0),
+    return ElevatedButton(
+      onPressed: onTap,
+      style: ElevatedButton.styleFrom(
+        // Usa el color proporcionado o el color primario del tema por defecto
+        padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: Theme.of(context).colorScheme.inversePrimary,
+          fontWeight: FontWeight.bold,
         ),
-        //text
-        child: Center(
-          child: Text(widget.text, 
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 15.0,
-          ),
-          )),
       ),
     );
   }

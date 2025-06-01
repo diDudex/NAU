@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:nau/components/my_button.dart';
 import 'package:nau/components/my_loading_circle.dart';
 import 'package:nau/components/my_text_field.dart';
+import 'package:nau/pages/perfilconfig.dart';
+import 'package:nau/pages/signup.dart';
 import 'package:nau/services/auth/auth_services.dart';
 
 /*
@@ -20,7 +22,7 @@ class Login extends StatefulWidget {
   final void Function()? onTap;
 
   const Login({super.key, this.onTap});
-
+  
   @override
   State<Login> createState() => _LoginState();
 }
@@ -42,21 +44,22 @@ class _LoginState extends State<Login> {
       await _auth.loginEmailPassword(emailController.text, pwController.text);
       //si se logra iniciar sesion, se cierra el coso que gira de carga
       if (mounted) hideLoadingCircle(context);
-    } 
+    }
     //cachar cualquier error
     catch (e) {
       //si se logra iniciar sesion, se cierra el coso que gira de carga
       if (mounted) hideLoadingCircle(context);
-       //mostrar mensaje de error
-        if (mounted) {
-          showDialog(
-              context: context,
-              builder: (context) => AlertDialog(
-                    title: Text(e.toString()),
-         ));
-        }
+      //mostrar mensaje de error
+      if (mounted) {
+        showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+                  title: Text(e.toString()),
+                ));
+      }
     }
   }
+
   //construccion de la interfaz
   @override
   Widget build(BuildContext context) {
@@ -78,7 +81,7 @@ class _LoginState extends State<Login> {
                     size: 50.0,
                     color: Theme.of(context).colorScheme.inversePrimary,
                   ),
-              
+
                   const SizedBox(height: 50.0),
                   //mensaje de bienvenida
                   Text(
@@ -89,9 +92,9 @@ class _LoginState extends State<Login> {
                       color: Theme.of(context).colorScheme.inversePrimary,
                     ),
                   ),
-                    const SizedBox(height: 50.0),
-                    // Botón de inicio de sesión con huella digital
-                    IconButton(
+                  const SizedBox(height: 50.0),
+                  // Botón de inicio de sesión con huella digital
+                  IconButton(
                     icon: Icon(
                       Icons.fingerprint,
                       size: 40.0,
@@ -105,15 +108,15 @@ class _LoginState extends State<Login> {
                       // final isAuthenticated = await LocalAuthService.authenticate();
                       // if (isAuthenticated) { /* Lógica de inicio de sesión */ }
                       showDialog(
-                      context: context,
-                      builder: (context) => const AlertDialog(
-                        title: Text('Función no implementada'),
-                        content: Text('Aquí irá el inicio de sesión con huella digital.'),
-                      ),
+                        context: context,
+                        builder: (context) => const AlertDialog(
+                          title: Text('Función no implementada'),
+                          content: Text(
+                              'Aquí irá el inicio de sesión con huella digital.'),
+                        ),
                       );
                     },
-                    ),
-                  
+                  ),
 
                   const SizedBox(height: 50.0),
                   //user-email textfield
@@ -142,27 +145,48 @@ class _LoginState extends State<Login> {
                   const SizedBox(height: 50.0),
                   //sig in button
                   MyButton(text: "Entrar", onTap: login),
-              
+
                   const SizedBox(height: 50.0),
                   //no tienes cuenta? registrate
+                  // ... código anterior ...
+
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
                         "¿No tienes cuenta?",
                         style: TextStyle(
-                            color: Theme.of(context).colorScheme.inversePrimary),
+                          color: Theme.of(context).colorScheme.inversePrimary,
+                        ),
                       ),
                       const SizedBox(width: 10.0),
-                      //si el usuario no tiene cuenta lo llevara a la pantalla de registro
-                      GestureDetector(
-                          onTap: widget.onTap,
-                          child: Text("Registrate ahora",
-                              style: TextStyle(
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .inversePrimary,
-                                  fontWeight: FontWeight.bold))),
+                        GestureDetector(
+                        onTap: () {
+                          if (mounted) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => Signup(onTap: () {
+                                Navigator.pop(context);
+                              }),
+                            ),
+                          );
+                          }
+                        },
+                        // Aumentar área táctil
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          child: Text(
+                            "Regístrate ahora",
+                            style: TextStyle(
+                              color:
+                                  Theme.of(context).colorScheme.inversePrimary,
+                              fontWeight: FontWeight.bold,
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
+                        ),
+                      ),
                     ],
                   )
                 ],

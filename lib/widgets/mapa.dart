@@ -2,9 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class MapaScreen extends StatefulWidget {
-  const MapaScreen({super.key});
+  final Map<String, dynamic>? selectedBus;
+
+  const MapaScreen({super.key, this.selectedBus});
 
   @override
   _MapaScreenState createState() => _MapaScreenState();
@@ -12,13 +16,20 @@ class MapaScreen extends StatefulWidget {
 
 class _MapaScreenState extends State<MapaScreen> {
   GoogleMapController? _mapController;
-  LatLng _initialPosition = const LatLng(19.4326, -99.1332); // CDMX por default
-  Marker? _userMarker;
+  LatLng _initialPosition = const LatLng(25.367269591435303, -108.15921351313591);
+  Set<Marker> _markers = {};
+  Set<Polyline> _polylines = {};
+  bool _loadingRoute = false;
+
+  // Reemplaza con tu API key de Google Maps
+  static const String _googleMapsApiKey = 'AIzaSyCnafhmFze96Dvw5-jPI29MdhiZWJaO45U';
+  static const String _directionsBaseUrl = 'https://maps.googleapis.com/maps/api/directions/json';
 
   @override
   void initState() {
     super.initState();
     _obtenerUbicacionActual();
+    _setupBusRoute();
   }
 
   Future<void> _obtenerUbicacionActual() async {
@@ -30,40 +41,211 @@ class _MapaScreenState extends State<MapaScreen> {
       );
 
       setState(() {
-        _initialPosition = LatLng(posicion.latitude, posicion.longitude);
-        _userMarker = Marker(
-          markerId: const MarkerId("ubicacion_usuario"),
-          position: _initialPosition,
-          infoWindow: const InfoWindow(title: "Estás aquí"),
+        _markers.add(
+          Marker(
+            markerId: const MarkerId('user_location'),
+            position: LatLng(posicion.latitude, posicion.longitude),
+            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
+            infoWindow: const InfoWindow(title: 'Tu ubicación'),
+          ),
         );
       });
-
-      _mapController?.animateCamera(
-        CameraUpdate.newCameraPosition(
-          CameraPosition(
-            target: _initialPosition,
-            zoom: 17,
-          ),
-        ),
-      );
     } else {
       print("Permiso denegado");
     }
   }
 
+  Future<void> _setupBusRoute() async {
+    if (widget.selectedBus == null) return;
+
+    setState(() {
+      _loadingRoute = true;
+    });
+
+    // Coordenadas reales del autobús
+    final LatLng origin = const LatLng(25.367269591435303, -108.15921351313591);
+    final LatLng destination = const LatLng(25.461071231845242, -108.08470040559769);
+
+    // Marcadores para origen y destino
+    _markers.addAll([
+      Marker(
+        markerId: const MarkerId('origin'),
+        position: origin,
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+        infoWindow: const InfoWindow(title: 'Origen'),
+      ),
+      Marker(
+        markerId: const MarkerId('destination'),
+        position: destination,
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+        infoWindow: const InfoWindow(title: 'Destino'),
+      ),
+    ]);
+
+    // Obtener ruta de Directions API
+    final List<LatLng> routePoints = await _getRoutePoints(origin, destination);
+
+    if (routePoints.isNotEmpty) {
+      setState(() {
+        _polylines.add(
+          Polyline(
+            polylineId: const PolylineId('bus_route'),
+            points: routePoints,
+            color: Colors.blue,
+            width: 5,
+          ),
+        );
+
+        // Centrar el mapa para mostrar toda la ruta
+        _initialPosition = LatLng(
+          (origin.latitude + destination.latitude) / 2,
+          (origin.longitude + destination.longitude) / 2,
+        );
+      });
+
+      // Ajustar la vista para mostrar toda la ruta
+      _mapController?.animateCamera(
+        CameraUpdate.newLatLngBounds(
+          _boundsFromLatLngList(routePoints),
+          100.0,
+        ),
+      );
+    }
+
+    setState(() {
+      _loadingRoute = false;
+    });
+  }
+
+  Future<List<LatLng>> _getRoutePoints(LatLng origin, LatLng destination) async {
+    final url = Uri.parse(
+      '$_directionsBaseUrl?'
+      'origin=${origin.latitude},${origin.longitude}&'
+      'destination=${destination.latitude},${destination.longitude}&'
+      'key=$_googleMapsApiKey',
+    );
+
+    try {
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['status'] == 'OK') {
+          // Decodificar puntos de la ruta
+          final points = data['routes'][0]['overview_polyline']['points'];
+          return _decodePolyline(points);
+        }
+      }
+      return [origin, destination]; // Fallback a línea recta
+    } catch (e) {
+      print('Error obteniendo ruta: $e');
+      return [origin, destination]; // Fallback a línea recta
+    }
+  }
+
+  List<LatLng> _decodePolyline(String encoded) {
+    List<LatLng> points = [];
+    int index = 0, len = encoded.length;
+    int lat = 0, lng = 0;
+
+    while (index < len) {
+      int b, shift = 0, result = 0;
+      do {
+        b = encoded.codeUnitAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+      int dlat = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
+      lat += dlat;
+
+      shift = 0;
+      result = 0;
+      do {
+        b = encoded.codeUnitAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+      int dlng = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
+      lng += dlng;
+
+      points.add(LatLng(lat / 1E5, lng / 1E5));
+    }
+    return points;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: GoogleMap(
-        initialCameraPosition: CameraPosition(
-          target: _initialPosition,
-          zoom: 14,
-        ),
-        markers: _userMarker != null ? {_userMarker!} : {},
-        myLocationEnabled: true,
-        myLocationButtonEnabled: true,
-        onMapCreated: (controller) => _mapController = controller,
+      appBar: AppBar(
+        title: Text(widget.selectedBus?['nombre'] ?? 'Mapa de Autobús'
+        , style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
       ),
+      body: Stack(
+        children: [
+          GoogleMap(
+            initialCameraPosition: CameraPosition(
+              target: _initialPosition,
+              zoom: 12,
+            ),
+            markers: _markers,
+            polylines: _polylines,
+            myLocationEnabled: true,
+            myLocationButtonEnabled: true,
+            onMapCreated: (controller) {
+              _mapController = controller;
+            },
+          ),
+          if (_loadingRoute)
+            const Center(
+              child: CircularProgressIndicator(),
+            ),
+        ],
+      ),
+      floatingActionButton: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          FloatingActionButton(
+            heroTag: 'gps_button',
+            onPressed: _obtenerUbicacionActual,
+            child: const Icon(Icons.gps_fixed),
+            mini: true,
+          ),
+          const SizedBox(height: 10),
+          FloatingActionButton(
+            heroTag: 'route_button',
+            onPressed: () {
+              if (_polylines.isNotEmpty) {
+                _mapController?.animateCamera(
+                  CameraUpdate.newLatLngBounds(
+                    _boundsFromLatLngList(_polylines.first.points),
+                    100.0,
+                  ),
+                );
+              }
+            },
+            child: const Icon(Icons.alt_route),
+            mini: true,
+          ),
+        ],
+      ),
+    );
+  }
+
+  LatLngBounds _boundsFromLatLngList(List<LatLng> list) {
+    double? x0, x1, y0, y1;
+    for (LatLng latLng in list) {
+      if (x0 == null) {
+        x0 = x1 = latLng.latitude;
+        y0 = y1 = latLng.longitude;
+      } else {
+        if (latLng.latitude > x1!) x1 = latLng.latitude;
+        if (latLng.latitude < x0) x0 = latLng.latitude;
+        if (latLng.longitude > y1!) y1 = latLng.longitude;
+        if (latLng.longitude < y0!) y0 = latLng.longitude;
+      }
+    }
+    return LatLngBounds(
+      northeast: LatLng(x1!, y1!),
+      southwest: LatLng(x0!, y0!),
     );
   }
 }

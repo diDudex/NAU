@@ -302,8 +302,8 @@ class _HomeScreenState extends State<HomeScreen> {
                               nombre.contains(search);
                         })
                         .where((bus) {
-                          final horaSalidaStr = bus['horaSalida'];
-                          if (horaSalidaStr == null) return false;
+                          final horaLlegadaStr = bus['horaLlegada'];
+                          if (horaLlegadaStr == null) return false;
 
                           final busDate = bus['createdAt'] != null
                               ? (bus['createdAt'] is Timestamp
@@ -325,18 +325,18 @@ class _HomeScreenState extends State<HomeScreen> {
                             return true;
                           }
 
-                          // Para autobuses de hoy, mostrar solo los que salen después de ahora
+                          // Para autobuses de hoy, mostrar solo los que aún no han llegado
                           if (busDate.year == now.year &&
                               busDate.month == now.month &&
                               busDate.day == now.day) {
-                            final salida = _parseTime(horaSalidaStr);
-                            final salidaDateTime = DateTime(
+                            final llegada = _parseTime(horaLlegadaStr);
+                            final llegadaDateTime = DateTime(
                                 busDate.year,
                                 busDate.month,
                                 busDate.day,
-                                salida.hour,
-                                salida.minute);
-                            return salidaDateTime.isAfter(now);
+                                llegada.hour,
+                                llegada.minute);
+                            return llegadaDateTime.isAfter(now);
                           }
 
                           return false;
@@ -359,12 +359,70 @@ class _HomeScreenState extends State<HomeScreen> {
                             subtitle: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                    'Hora salida: ${bus['horaSalida'] ?? 'N/A'}'),
+                                Builder(
+                                  builder: (context) {
+                                    final now = DateTime.now();
+                                    final salida = _parseTime(bus['horaSalida'] ?? '12:00 AM');
+                                    final llegada = _parseTime(bus['horaLlegada'] ?? '12:00 AM');
+                                    final salidaDateTime = DateTime(
+                                      busDate.year,
+                                      busDate.month,
+                                      busDate.day,
+                                      salida.hour,
+                                      salida.minute,
+                                    );
+                                    final llegadaDateTime = DateTime(
+                                      busDate.year,
+                                      busDate.month,
+                                      busDate.day,
+                                      llegada.hour,
+                                      llegada.minute,
+                                    );
+
+                                    String formatDuration(int totalMinutes) {
+                                      final hours = totalMinutes ~/ 60;
+                                      final minutes = totalMinutes % 60;
+                                      if (hours > 0 && minutes > 0) {
+                                        return '$hours hora${hours > 1 ? 's' : ''} $minutes minutos';
+                                      } else if (hours > 0) {
+                                        return '$hours hora${hours > 1 ? 's' : ''}';
+                                      } else {
+                                        return '$minutes minutos';
+                                      }
+                                    }
+
+                                    if (now.isBefore(salidaDateTime)) {
+                                      final minutosSalida = salidaDateTime.difference(now).inMinutes;
+                                      return Text('Sale en: ${formatDuration(minutosSalida)}');
+                                    } else if (now.isAfter(salidaDateTime) && now.isBefore(llegadaDateTime)) {
+                                      final minutosLlegada = llegadaDateTime.difference(now).inMinutes;
+                                      final minutosSalida = now.difference(salidaDateTime).inMinutes;
+                                      return Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'Salió hace: ${formatDuration(minutosSalida)}',
+                                            style: const TextStyle(color: Colors.red),
+                                          ),
+                                          Text(
+                                            'Llega en: ${formatDuration(minutosLlegada)}',
+                                            style: const TextStyle(color: Colors.orange),
+                                          ),
+                                        ],
+                                      );
+                                    } else if (now.isAfter(llegadaDateTime)) {
+                                      return Text(
+                                        'Llegó a las: ${bus['horaLlegada'] ?? 'N/A'}',
+                                        style: const TextStyle(color: Colors.grey),
+                                      );
+                                    } else {
+                                      return Text('Hora salida: ${bus['horaSalida'] ?? 'N/A'}');
+                                    }
+                                  },
+                                ),
                                 Text('Fecha: $fechaStr'),
                                 if (busDate.day == DateTime.now().day + 1)
-                                  const Text('(Mañana)',
-                                      style: TextStyle(color: Colors.green)),
+                                  const Text('(Mañana)', style: TextStyle(color: Colors.green)),
                               ],
                             ),
                             onTap: () {

@@ -4,6 +4,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:cloud_firestore/cloud_firestore.dart'; // Asegúrate de importar el paquete de Firestore
 
 class MapaScreen extends StatefulWidget {
   final Map<String, dynamic>? selectedBus;
@@ -16,14 +17,16 @@ class MapaScreen extends StatefulWidget {
 
 class _MapaScreenState extends State<MapaScreen> {
   GoogleMapController? _mapController;
-  LatLng _initialPosition = const LatLng(25.367269591435303, -108.15921351313591);
-  Set<Marker> _markers = {};
+  LatLng _initialPosition =
+      const LatLng(25.367269591435303, -108.15921351313591);
   Set<Polyline> _polylines = {};
   bool _loadingRoute = false;
 
   // Reemplaza con tu API key de Google Maps
-  static const String _googleMapsApiKey = 'AIzaSyCnafhmFze96Dvw5-jPI29MdhiZWJaO45U';
-  static const String _directionsBaseUrl = 'https://maps.googleapis.com/maps/api/directions/json';
+  static const String _googleMapsApiKey =
+      'AIzaSyCnafhmFze96Dvw5-jPI29MdhiZWJaO45U';
+  static const String _directionsBaseUrl =
+      'https://maps.googleapis.com/maps/api/directions/json';
 
   @override
   void initState() {
@@ -40,16 +43,12 @@ class _MapaScreenState extends State<MapaScreen> {
         desiredAccuracy: LocationAccuracy.high,
       );
 
-      setState(() {
-        _markers.add(
-          Marker(
-            markerId: const MarkerId('user_location'),
-            position: LatLng(posicion.latitude, posicion.longitude),
-            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
-            infoWindow: const InfoWindow(title: 'Tu ubicación'),
-          ),
-        );
-      });
+      // Solo mueve la cámara a la ubicación actual, no agrega marcador
+      _mapController?.animateCamera(
+        CameraUpdate.newLatLng(
+          LatLng(posicion.latitude, posicion.longitude),
+        ),
+      );
     } else {
       print("Permiso denegado");
     }
@@ -66,62 +65,74 @@ class _MapaScreenState extends State<MapaScreen> {
     final LatLng origin = const LatLng(25.367269591435303, -108.15921351313591);
     final LatLng destination = const LatLng(25.461071231845242, -108.08470040559769);
 
-    // Marcadores para origen y destino
-    _markers.addAll([
-      Marker(
-        markerId: const MarkerId('origin'),
-        position: origin,
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
-        infoWindow: const InfoWindow(title: 'Origen'),
-      ),
-      Marker(
-        markerId: const MarkerId('destination'),
-        position: destination,
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
-        infoWindow: const InfoWindow(title: 'Destino'),
-      ),
-    ]);
+    // Waypoints proporcionados
+    final busDoc = await FirebaseFirestore.instance
+        .collection('busRoutes')
+        .doc(widget.selectedBus!['id'])
+        .get();
 
-    // Obtener ruta de Directions API
-    final List<LatLng> routePoints = await _getRoutePoints(origin, destination);
+    if (busDoc.exists) {
+      final routeData = busDoc.data() as Map<String, dynamic>;
 
-    if (routePoints.isNotEmpty) {
-      setState(() {
-        _polylines.add(
-          Polyline(
-            polylineId: const PolylineId('bus_route'),
-            points: routePoints,
-            color: Colors.blue,
-            width: 5,
+      // Obtener waypoints desde Firestore
+      List<LatLng> waypoints = [];
+      if (routeData['waypoints'] != null) {
+        waypoints = (routeData['waypoints'] as List<dynamic>).map((point) {
+          return LatLng(point['lat'], point['lng']);
+        }).toList();
+      }
+
+      // Obtener ruta de Directions API con waypoints
+      final List<LatLng> routePoints =
+          await _getRoutePoints(origin, destination, waypoints);
+
+      if (routePoints.isNotEmpty) {
+        setState(() {
+          _polylines.add(
+            Polyline(
+              polylineId: const PolylineId('bus_route'),
+              points: routePoints,
+              color: Colors.blue,
+              width: 5,
+            ),
+          );
+
+          // Centrar el mapa para mostrar toda la ruta
+          _initialPosition = LatLng(
+            (origin.latitude + destination.latitude) / 2,
+            (origin.longitude + destination.longitude) / 2,
+          );
+        });
+
+        // Ajustar la vista para mostrar toda la ruta
+        _mapController?.animateCamera(
+          CameraUpdate.newLatLngBounds(
+            _boundsFromLatLngList(routePoints),
+            100.0,
           ),
         );
+      }
 
-        // Centrar el mapa para mostrar toda la ruta
-        _initialPosition = LatLng(
-          (origin.latitude + destination.latitude) / 2,
-          (origin.longitude + destination.longitude) / 2,
-        );
+      setState(() {
+        _loadingRoute = false;
       });
-
-      // Ajustar la vista para mostrar toda la ruta
-      _mapController?.animateCamera(
-        CameraUpdate.newLatLngBounds(
-          _boundsFromLatLngList(routePoints),
-          100.0,
-        ),
-      );
     }
-
-    setState(() {
-      _loadingRoute = false;
-    });
   }
 
-  Future<List<LatLng>> _getRoutePoints(LatLng origin, LatLng destination) async {
+  Future<List<LatLng>> _getRoutePoints(
+      LatLng origin, LatLng destination, List<LatLng> waypoints) async {
+    // Construir cadena de waypoints para la URL
+    String waypointsParam = '';
+    if (waypoints.isNotEmpty) {
+      waypointsParam =
+          '&waypoints=optimize:true|${waypoints.map((point) => '${point.latitude},${point.longitude}').join('|')}';
+    }
+
     final url = Uri.parse(
       '$_directionsBaseUrl?'
       'origin=${origin.latitude},${origin.longitude}&'
-      'destination=${destination.latitude},${destination.longitude}&'
+      'destination=${destination.latitude},${destination.longitude}'
+      '$waypointsParam&'
       'key=$_googleMapsApiKey',
     );
 
@@ -135,10 +146,18 @@ class _MapaScreenState extends State<MapaScreen> {
           return _decodePolyline(points);
         }
       }
-      return [origin, destination]; // Fallback a línea recta
+      return [
+        origin,
+        ...waypoints,
+        destination
+      ]; // Fallback a línea recta con waypoints
     } catch (e) {
       print('Error obteniendo ruta: $e');
-      return [origin, destination]; // Fallback a línea recta
+      return [
+        origin,
+        ...waypoints,
+        destination
+      ]; // Fallback a línea recta con waypoints
     }
   }
 
@@ -176,8 +195,8 @@ class _MapaScreenState extends State<MapaScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.selectedBus?['nombre'] ?? 'Mapa de Autobús'
-        , style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+        title: Text(widget.selectedBus?['nombre'] ?? 'Mapa de Autobús',
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
       ),
       body: Stack(
         children: [
@@ -186,7 +205,6 @@ class _MapaScreenState extends State<MapaScreen> {
               target: _initialPosition,
               zoom: 12,
             ),
-            markers: _markers,
             polylines: _polylines,
             myLocationEnabled: true,
             myLocationButtonEnabled: true,
@@ -203,12 +221,6 @@ class _MapaScreenState extends State<MapaScreen> {
       floatingActionButton: Column(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
-          FloatingActionButton(
-            heroTag: 'gps_button',
-            onPressed: _obtenerUbicacionActual,
-            child: const Icon(Icons.gps_fixed),
-            mini: true,
-          ),
           const SizedBox(height: 10),
           FloatingActionButton(
             heroTag: 'route_button',

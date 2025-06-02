@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:nau/components/my_button.dart';
 import 'package:nau/components/my_loading_circle.dart';
 import 'package:nau/components/my_text_field.dart';
-import 'package:nau/pages/perfilconfig.dart';
 import 'package:nau/pages/signup.dart';
 import 'package:nau/services/auth/auth_services.dart';
 

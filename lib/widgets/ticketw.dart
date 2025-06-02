@@ -25,11 +25,12 @@ class TicketW extends StatefulWidget {
 
 class _TicketWState extends State<TicketW> {
   final GlobalKey _ticketKey = GlobalKey();
+  // Variables para manejar el estado de compra y generación de imagen
   bool _comprado = false;
   Uint8List? _ticketImage;
   bool _guardando = false;
   double _total = 0.0;
-  List<String> _boletosIds = []; // Almacena los IDs de los boletos
+  List<String> _boletosIds = [];
   bool _shouldRefresh = false;
 
   @override
@@ -155,8 +156,7 @@ class _TicketWState extends State<TicketW> {
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         decoration: BoxDecoration(
                           border: Border.symmetric(
-                            horizontal:
-                                BorderSide(color: Colors.grey.shade300),
+                            horizontal: BorderSide(color: Colors.grey.shade300),
                           ),
                         ),
                         child: Column(
@@ -234,14 +234,12 @@ class _TicketWState extends State<TicketW> {
                     ),
                     onPressed: _guardando ? null : _comprarBoletos,
                     child: _guardando
-                        ? const CircularProgressIndicator(
-                            color: Colors.white)
+                        ? const CircularProgressIndicator(color: Colors.white)
                         : Text(
                             'Confirmar ${widget.boletos.length} Boleto${widget.boletos.length > 1 ? 's' : ''}',
                             style: TextStyle(
                               fontSize: 18,
-                              color:
-                                  Theme.of(context).colorScheme.onPrimary,
+                              color: Theme.of(context).colorScheme.onPrimary,
                             ),
                           ),
                   ),
@@ -286,20 +284,21 @@ class _TicketWState extends State<TicketW> {
   Future<void> _comprarBoletos() async {
     setState(() {
       _guardando = true;
-      _shouldRefresh = true; // Marcar para refrescar al salir
+      _shouldRefresh = true;
     });
 
     try {
       final batch = FirebaseFirestore.instance.batch();
       final ticketsRef = FirebaseFirestore.instance.collection('Boletos');
-      _boletosIds = []; // Resetear IDs
+      _boletosIds = [];
 
+      // 1. Crear documentos de boletos
       for (final boleto in widget.boletos) {
-        final docRef = ticketsRef.doc(); // Generar ID único
-        _boletosIds.add(docRef.id); // Guardar ID
+        final docRef = ticketsRef.doc();
+        _boletosIds.add(docRef.id);
 
         batch.set(docRef, {
-          'id': docRef.id, // Incluir ID en el documento
+          'id': docRef.id,
           'ruta': boleto.ruta,
           'asiento': boleto.asiento,
           'fecha': boleto.fecha,
@@ -308,19 +307,22 @@ class _TicketWState extends State<TicketW> {
           'fechaCompra': FieldValue.serverTimestamp(),
           'estado': 'activo',
           'rutaId': widget.busRouteId,
-          'qrData': 'boleto_${docRef.id}', // Datos para el QR
+          'qrData': 'boleto_${docRef.id}',
         });
       }
 
-      // Actualizar asientos ocupados
+      // 2. Actualizar estado de asientos en la ruta
       final routeRef = FirebaseFirestore.instance
           .collection('busRoutes')
           .doc(widget.busRouteId);
 
-      batch.update(routeRef, {
-        'occupiedSeats': FieldValue.arrayUnion(
-            widget.boletos.map((b) => b.asiento).toList()),
-      });
+      // Crear mapa de actualización para los asientos
+      final seatsUpdate = {
+        for (var boleto in widget.boletos)
+          'seats.${boleto.asiento}': true // Marcar asientos como ocupados
+      };
+
+      batch.update(routeRef, seatsUpdate);
 
       await batch.commit();
       widget.onTicketPurchased();

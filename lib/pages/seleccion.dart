@@ -16,65 +16,69 @@ class SeatSelectionScreen extends StatefulWidget {
 
 class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
   List<int> selectedSeats = [];
-  List<int> availableSeats = [];
-  List<int> occupiedSeats = [];
+  Map<int, bool> seatAvailability = {}; 
   bool isLoading = false;
   bool isPurchasing = false;
 
   @override
   void initState() {
     super.initState();
-    _loadInitialData();
+    _loadSeatData();
   }
 
-  Future<void> _loadInitialData() async {
-    setState(() => isLoading = true);
-    occupiedSeats = List<int>.from(widget.busData['occupiedSeats'] ?? []);
-    availableSeats = List.generate(24, (index) => index + 1)
-      ..removeWhere((seat) => occupiedSeats.contains(seat));
-    if (mounted) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) setState(() => isLoading = false);
-      });
-    }
-  }
+  Future<void> _loadSeatData() async {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() => isLoading = true);
+    });
 
-  Future<void> _refreshData() async {
     try {
-      setState(() => isLoading = true);
       final doc = await FirebaseFirestore.instance
           .collection('busRoutes')
           .doc(widget.busData['id'])
           .get();
 
-      if (!mounted) return;
+      if (doc.exists) {
+        final data = doc.data() as Map<String, dynamic>;
+        final seatsData = data['seats'] as Map<String, dynamic>? ?? {};
 
-      setState(() {
-        occupiedSeats = List<int>.from(doc.data()?['occupiedSeats'] ?? []);
-        availableSeats = List.generate(24, (index) => index + 1)
-          ..removeWhere((seat) => occupiedSeats.contains(seat));
-      });
+        setState(() {
+          // Convertir los datos de Firestore a nuestro mapa
+          seatAvailability = {
+            for (var entry in seatsData.entries)
+              int.parse(entry.key): entry.value as bool
+          };
+
+          // Asegurarnos de tener todos los asientos (1-24)
+          for (int i = 1; i <= 24; i++) {
+            seatAvailability.putIfAbsent(
+                i, () => false); // Por defecto disponibles
+          }
+        });
+      }
     } catch (e) {
-      if (!mounted) return;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error al actualizar: $e')),
-          );
-        }
-      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al cargar asientos: $e')),
+        );
+      }
     } finally {
-      if (!mounted) return;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) setState(() => isLoading = false);
-      });
+      if (mounted) {
+        setState(() => isLoading = false);
+      }
     }
   }
 
+  Future<void> _refreshData() async {
+    await _loadSeatData();
+  }
+
   Future<void> _confirmPurchase() async {
+    if (selectedSeats.isEmpty) return;
+
     setState(() => isPurchasing = true);
 
     try {
+      // Crear los boletos
       final boletos = selectedSeats
           .map((asiento) => Boleto(
                 asiento: asiento,
@@ -85,7 +89,20 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
               ))
           .toList();
 
-      // Navegar a TicketW y esperar resultado
+      // Actualizar los asientos en Firestore
+      final batch = FirebaseFirestore.instance.batch();
+      final busRef = FirebaseFirestore.instance
+          .collection('busRoutes')
+          .doc(widget.busData['id']);
+
+      // Marcar asientos como ocupados
+      for (var seat in selectedSeats) {
+        batch.update(busRef, {'seats.$seat': true});
+      }
+
+      await batch.commit();
+
+      // Mostrar tickets
       final success = await Navigator.push<bool>(
             context,
             MaterialPageRoute(
@@ -102,7 +119,6 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
           false;
 
       if (success && mounted) {
-        // Forzar una nueva carga de datos desde Firestore
         await _refreshData();
         setState(() => selectedSeats.clear());
         ScaffoldMessenger.of(context).showSnackBar(
@@ -122,179 +138,176 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
     }
   }
 
-  // Método auxiliar para construir los asientos
-  Widget _buildSeat(int seatNumber) {
-    final isAvailable = availableSeats.contains(seatNumber);
-    final isSelected = selectedSeats.contains(seatNumber);
-
-    return GestureDetector(
-      onTap: isAvailable
-          ? () {
-              setState(() {
-                if (isSelected) {
-                  selectedSeats.remove(seatNumber);
-                } else {
-                  selectedSeats.add(seatNumber);
-                }
-              });
-            }
-          : null,
-      child: Container(
-        width: 55,
-        height: 55,
-        margin: const EdgeInsets.all(2),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? Colors.blue.shade600
-              : isAvailable
-                  ? Colors.white
-                  : Colors.grey.shade400,
-          border: Border.all(
-            color: isSelected
-                ? Colors.blue.shade800
-                : isAvailable
-                    ? Colors.grey.shade600
-                    : Colors.grey.shade600,
-            width: 1.5,
-          ),
-          borderRadius: BorderRadius.circular(8),
-          boxShadow: [
-            if (isSelected)
-              BoxShadow(
-                color: Colors.blue.withOpacity(0.3),
-                blurRadius: 4,
-                offset: const Offset(0, 2),
-              ),
-          ],
-        ),
-        child: Stack(
-          children: [
-            // Número del asiento
-            Center(
-              child: Text(
-                seatNumber.toString(),
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: isSelected
-                      ? Colors.white
-                      : isAvailable
-                          ? Colors.black
-                          : Colors.grey.shade600,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   // Método para construir el layout del autobús
   // Este método crea la estructura visual del autobús con los asientos
   Widget _buildBusLayout() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 30),
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.shade400, width: 2),
-      ),
-      child: Column(
-        children: [
-          // Cabina del conductor
-          Container(
-            height: 40,
-            width: double.infinity,
-            margin: const EdgeInsets.only(bottom: 20),
-            decoration: BoxDecoration(
-              color: Colors.grey.shade300,
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(15),
-              ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.airline_seat_recline_normal,
-                    color: Colors.grey.shade600, size: 24),
-                const SizedBox(width: 8),
-                Text(
-                  'CONDUCTOR',
-                  style: TextStyle(
-                    color: Colors.grey.shade700,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
+  return Container(
+    margin: const EdgeInsets.symmetric(horizontal: 30),
+    padding: const EdgeInsets.all(10),
+    decoration: BoxDecoration(
+      color: Colors.grey.shade100,
+      borderRadius: BorderRadius.circular(20),
+      border: Border.all(color: Colors.grey.shade400, width: 2),
+    ),
+    child: Column(
+      children: [
+        // Cabina del conductor
+        Container(
+          height: 40,
+          width: double.infinity,
+          margin: const EdgeInsets.only(bottom: 20),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade300,
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(15),
             ),
           ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.airline_seat_recline_normal,
+                  color: Colors.grey.shade600, size: 24),
+              const SizedBox(width: 8),
+              Text(
+                'CONDUCTOR',
+                style: TextStyle(
+                  color: Colors.grey.shade700,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ),
 
-          // Asientos del autobús
-          Expanded(
-            child: ListView.builder(
-              itemCount: availableSeats.length ~/ 2.5, 
-              itemBuilder: (context, rowIndex) {
-                return Container(
-                  margin: const EdgeInsets.symmetric(vertical: 8),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      // Lado izquierdo (2 asientos)
-                      Row(
+        // Asientos del autobús con pasillo central
+        Expanded(
+          child: ListView.builder(
+            itemCount: 6, // 6 filas (4 asientos por fila = 24 total)
+            itemBuilder: (context, rowIndex) {
+              return Container(
+                margin: const EdgeInsets.symmetric(vertical: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // Lado izquierdo (2 asientos)
+                    Row(
+                      children: [
+                        _buildSeat((rowIndex * 4) + 1),
+                        const SizedBox(width: 8),
+                        _buildSeat((rowIndex * 4) + 2),
+                      ],
+                    ),
+
+                    // Pasillo
+                    SizedBox(
+                      width: 50,
+                      height: 45,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          _buildSeat((rowIndex * 4) + 1),
-                          const SizedBox(width: 8),
-                          _buildSeat((rowIndex * 4) + 2),
-                        ],
-                      ),
-
-                      // Pasillo
-                      SizedBox(
-                        width: 50,
-                        height: 45,
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Container(
-                              width: 2,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    Colors.grey.shade300,
-                                    Colors.grey.shade500,
-                                    Colors.grey.shade300,
-                                  ],
-                                  begin: Alignment.topCenter,
-                                  end: Alignment.bottomCenter,
-                                ),
+                          Container(
+                            width: 2,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  Colors.grey.shade300,
+                                  Colors.grey.shade500,
+                                  Colors.grey.shade300,
+                                ],
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
                               ),
                             ),
-                          ],
-                        ),
-                      ),
-
-                      // Lado derecho (2 asientos)
-                      Row(
-                        children: [
-                          _buildSeat((rowIndex * 4) + 3),
-                          const SizedBox(width: 8),
-                          _buildSeat((rowIndex * 4) + 4),
+                          ),
                         ],
                       ),
-                    ],
-                  ),
-                );
-              },
+                    ),
+
+                    // Lado derecho (2 asientos)
+                    Row(
+                      children: [
+                        _buildSeat((rowIndex * 4) + 3),
+                        const SizedBox(width: 8),
+                        _buildSeat((rowIndex * 4) + 4),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+Widget _buildSeat(int seatNumber) {
+  final isOccupied = seatAvailability[seatNumber] == true; // true significa ocupado
+  final isSelected = selectedSeats.contains(seatNumber);
+
+  return GestureDetector(
+    onTap: isOccupied ? null : () {
+      setState(() {
+        if (isSelected) {
+          selectedSeats.remove(seatNumber);
+        } else {
+          selectedSeats.add(seatNumber);
+        }
+      });
+    },
+    child: Container(
+      width: 55,
+      height: 55,
+      margin: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        color: isSelected
+            ? Colors.blue.shade600
+            : isOccupied
+                ? Colors.grey.shade400
+                : Colors.white,
+        border: Border.all(
+          color: isSelected
+              ? Colors.blue.shade800
+              : isOccupied
+                  ? Colors.grey.shade600
+                  : Colors.grey.shade600,
+          width: 1.5,
+        ),
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: [
+          if (isSelected)
+            BoxShadow(
+              color: Colors.blue.withOpacity(0.3),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          // Número del asiento
+          Center(
+            child: Text(
+              seatNumber.toString(),
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: isSelected
+                    ? Colors.white
+                    : isOccupied
+                        ? Colors.grey.shade600
+                        : Colors.black,
+              ),
             ),
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   @override
   Widget build(BuildContext context) {
@@ -353,11 +366,11 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
                   const SizedBox(height: 20),
 
                   // Leyenda de asientos
-                  const Row(
+                  Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      SeatLegend(color: Colors.green, text: 'Disponible'),
-                      SeatLegend(color: Colors.red, text: 'Ocupado'),
+                      SeatLegend(color: Colors.white, text: 'Disponible'),
+                      SeatLegend(color: Colors.grey.shade600, text: 'Ocupado'),
                       SeatLegend(color: Colors.blue, text: 'Seleccionado'),
                     ],
                   ),

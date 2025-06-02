@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:nau/screens_driver/DriverHomeScreen.dart';
 import '../pages/mapa/RouteEditorScreen.dart';
-import '../pages/profile_page.dart';
-import '../pages/home.dart';
-import '../pages/seleccion.dart';
+import '../pages/profile_screen.dart';
 import '../pages/settings_page.dart';
-import '../pages/walletscreen.dart';
 import '../services/auth/auth_services.dart';
 
 class MainNavigation extends StatefulWidget {
@@ -19,12 +17,10 @@ class _MainNavigationState extends State<MainNavigation> {
   String get currentUid => AuthService().getCurrentUid();
 
   List<Widget> get _screens => [
-     HomeScreen(),
-    const Walletscreen(),
+    DriverHomeScreen( uid: currentUid),
     const RouteEditorScreen(),
-    ProfilePage(uid: currentUid),
+    PerfilScreen(uid: currentUid),
     const SettingsPage(),
-    const SeatSelectionScreen(),
   ];
 
   void _onItemTapped(int index) {
@@ -49,10 +45,6 @@ class _MainNavigationState extends State<MainNavigation> {
             label: 'Inicio',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.account_balance_wallet),
-            label: 'Cartera',
-          ),
-          BottomNavigationBarItem(
             icon: Icon(Icons.route),
             label: 'Rutas',
           ),
@@ -63,10 +55,6 @@ class _MainNavigationState extends State<MainNavigation> {
           BottomNavigationBarItem(
             icon: Icon(Icons.settings),
             label: 'Ajustes',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.event_seat),
-            label: 'Asientos',
           ),
         ],
       ),

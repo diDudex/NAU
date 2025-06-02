@@ -1,5 +1,3 @@
-// lib/screens/route_editor_screen.dart
-
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_google_places_hoc081098/flutter_google_places_hoc081098.dart';
@@ -20,25 +18,36 @@ Future<List<LatLng>> fetchRoutePoints({
 }) async {
   final originParam = '${origin.latitude},${origin.longitude}';
   final destParam = '${destination.latitude},${destination.longitude}';
-  var uri = Uri.parse(
-    'https://maps.googleapis.com/maps/api/directions/json'
-    '?origin=$originParam'
-    '&destination=$destParam'
-    '&key=$_kGoogleApiKey'
-    '&mode=driving'
-    '&alternatives=false',
-  );
+
+  // Construir parámetros para la URL
+  final queryParameters = {
+    'origin': originParam,
+    'destination': destParam,
+    'key': _kGoogleApiKey,
+    'mode': 'driving',
+    'alternatives': 'false',
+  };
 
   if (waypoints != null && waypoints.isNotEmpty) {
     final wp = waypoints.map((p) => '${p.latitude},${p.longitude}').join('|');
-    uri = uri.replace(query: '${uri.query}&waypoints=${Uri.encodeComponent(wp)}');
+    queryParameters['waypoints'] = wp;
   }
 
-  final response = await http.get(uri);
-  final data = json.decode(response.body);
+  // Construir URI con parámetros correctamente codificados
+  final uri = Uri.https(
+    'maps.googleapis.com',
+    '/maps/api/directions/json',
+    queryParameters,
+  );
 
+  final response = await http.get(uri);
+  if (response.statusCode != 200) {
+    throw Exception('Error en la petición HTTP: ${response.statusCode}');
+  }
+
+  final data = json.decode(response.body);
   if (data['status'] != 'OK') {
-    throw Exception('Error en Directions API: ${data['status']}');
+    throw Exception('Directions API error: ${data['status']}');
   }
 
   final encoded = data['routes'][0]['overview_polyline']['points'] as String;
@@ -46,19 +55,18 @@ Future<List<LatLng>> fetchRoutePoints({
   return pts.map((p) => LatLng(p.latitude, p.longitude)).toList();
 }
 
-class RouteEditorScreen extends StatefulWidget {
-  const RouteEditorScreen({super.key});
+class BusRoutesPage extends StatefulWidget {
+  const BusRoutesPage({super.key});
 
   @override
-  State<RouteEditorScreen> createState() => _RouteEditorScreenState();
+  State<BusRoutesPage> createState() => _BusRoutesPageState();
 }
 
-class _RouteEditorScreenState extends State<RouteEditorScreen> {
+class _BusRoutesPageState extends State<BusRoutesPage> {
   LatLng? _originPos;
   LatLng? _destPos;
   final List<LatLng> _waypointsPos = [];
   final List<LatLng> _polylinePoints = [];
-  TimeOfDay? _horaSalida, _horaLlegada;
   GoogleMapController? _mapController;
   bool _pickingOrigin = false;
   bool _pickingDestination = false;
@@ -80,11 +88,9 @@ class _RouteEditorScreenState extends State<RouteEditorScreen> {
         language: 'es',
       );
       if (p == null) return;
-
       final detail = await _placesService.getDetailsByPlaceId(p.placeId!);
       final lat = detail.result.geometry!.location.lat;
       final lng = detail.result.geometry!.location.lng;
-
       setState(() {
         if (isOrigin) {
           _originPos = LatLng(lat, lng);
@@ -92,10 +98,7 @@ class _RouteEditorScreenState extends State<RouteEditorScreen> {
           _destPos = LatLng(lat, lng);
         }
       });
-
-      if (_originPos != null && _destPos != null) {
-        await _buildRoute();
-      }
+      if (_originPos != null && _destPos != null) await _buildRoute();
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error al buscar lugar: $e')),
@@ -110,30 +113,27 @@ class _RouteEditorScreenState extends State<RouteEditorScreen> {
       _pickingWaypoint = type == 'waypoint';
     });
 
-    String mensaje = 'Toca el mapa para seleccionar ';
-    if (_pickingOrigin) mensaje += 'el origen';
-    if (_pickingDestination) mensaje += 'el destino';
-    if (_pickingWaypoint) mensaje += 'un punto intermedio';
+    String mensaje = 'Toque el mapa para seleccionar ';
+    if (_pickingOrigin) mensaje += 'Origen';
+    if (_pickingDestination) mensaje += 'Destino';
+    if (_pickingWaypoint) mensaje += 'Waypoint';
 
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(mensaje)));
   }
 
   Future<void> _buildRoute() async {
     if (_originPos == null || _destPos == null) return;
-
     try {
       final pts = await fetchRoutePoints(
         origin: _originPos!,
         destination: _destPos!,
         waypoints: _waypointsPos,
       );
-
       setState(() {
         _polylinePoints
           ..clear()
           ..addAll(pts);
       });
-
       _mapController?.animateCamera(CameraUpdate.newLatLngZoom(_originPos!, 13));
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -142,48 +142,41 @@ class _RouteEditorScreenState extends State<RouteEditorScreen> {
     }
   }
 
-  Future<void> _pickTime(bool isStart) async {
-    final t = await showTimePicker(context: context, initialTime: TimeOfDay.now());
-    if (t != null) {
-      setState(() => isStart ? _horaSalida = t : _horaLlegada = t);
-    }
-  }
-
   Future<void> _saveRoute() async {
     if (_originPos == null ||
         _destPos == null ||
-        _horaSalida == null ||
-        _horaLlegada == null ||
         _nombreRutaController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Completa todos los campos')),
       );
       return;
     }
-
-    final doc = {
-      'nombre': _nombreRutaController.text.trim(),
-      'origin': {'lat': _originPos!.latitude, 'lng': _originPos!.longitude},
-      'destination': {'lat': _destPos!.latitude, 'lng': _destPos!.longitude},
-      'waypoints': _waypointsPos
-          .map((p) => {'lat': p.latitude, 'lng': p.longitude})
-          .toList(),
-      'polyline': _polylinePoints
-          .map((p) => {'lat': p.latitude, 'lng': p.longitude})
-          .toList(),
-      'horaSalida': _horaSalida!.format(context),
-      'horaLlegada': _horaLlegada!.format(context),
-      'createdAt': FieldValue.serverTimestamp(),
-    };
-
-    await FirebaseFirestore.instance.collection('busRoutes').add(doc);
-    Navigator.pop(context);
+    try {
+      final doc = {
+        'nombre': _nombreRutaController.text.trim(),
+        'origin': {'lat': _originPos!.latitude, 'lng': _originPos!.longitude},
+        'destination': {'lat': _destPos!.latitude, 'lng': _destPos!.longitude},
+        'waypoints': _waypointsPos
+            .map((p) => {'lat': p.latitude, 'lng': p.longitude})
+            .toList(),
+        'polyline': _polylinePoints
+            .map((p) => {'lat': p.latitude, 'lng': p.longitude})
+            .toList(),
+        'createdAt': FieldValue.serverTimestamp(),
+      };
+      await FirebaseFirestore.instance.collection('busRoutes').add(doc);
+      Navigator.pop(context);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al guardar la ruta: $e')),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Crear Ruta de Autobús')),
+      appBar: AppBar(title: const Text('Crear Nueva Ruta')),
       body: Column(
         children: [
           Padding(
@@ -205,15 +198,13 @@ class _RouteEditorScreenState extends State<RouteEditorScreen> {
                 Expanded(
                   child: ElevatedButton.icon(
                     icon: const Icon(Icons.add_location_alt),
-                    label: const Text('Waypoint (en mapa)'),
+                    label: const Text('Agregar Waypoint'),
                     onPressed: () => _enableTapPick('waypoint'),
                   ),
                 ),
               ],
             ),
           ),
-          _buildTimePickerTile('Hora de salida', _horaSalida, () => _pickTime(true)),
-          _buildTimePickerTile('Hora de llegada', _horaLlegada, () => _pickTime(false)),
           Padding(
             padding: const EdgeInsets.all(8),
             child: ElevatedButton(
@@ -294,14 +285,6 @@ class _RouteEditorScreenState extends State<RouteEditorScreen> {
         IconButton(icon: const Icon(Icons.search), onPressed: onSearch),
         IconButton(icon: const Icon(Icons.touch_app), onPressed: onTap),
       ],
-    );
-  }
-
-  Widget _buildTimePickerTile(String label, TimeOfDay? time, VoidCallback onTap) {
-    return ListTile(
-      leading: const Icon(Icons.schedule),
-      title: Text(time == null ? label : '$label: ${time.format(context)}'),
-      onTap: onTap,
     );
   }
 }

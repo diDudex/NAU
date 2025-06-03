@@ -1,5 +1,6 @@
 buildscript {
     ext.kotlin_version = '1.8.10'
+
     repositories {
         google()
         mavenCentral()
@@ -15,6 +16,12 @@ allprojects {
         google()
         mavenCentral()
     }
+}
+
+ext {
+    compileSdkVersion = project.hasProperty('compileSdkVersion') ? project.compileSdkVersion.toInteger() : 33
+    minSdkVersion = project.hasProperty('minSdkVersion') ? project.minSdkVersion.toInteger() : 23
+    targetSdkVersion = project.hasProperty('targetSdkVersion') ? project.targetSdkVersion.toInteger() : 33
 }
 
 rootProject.buildDir = "../build"

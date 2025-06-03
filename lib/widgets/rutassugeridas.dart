@@ -39,12 +39,12 @@ class RutasSugeridas extends StatelessWidget {
     final tomorrow = today.add(const Duration(days: 1));
     final currentTime = TimeOfDay.fromDateTime(now);
 
-    return FutureBuilder<QuerySnapshot>(
-      future: FirebaseFirestore.instance
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
           .collection('busRoutes')
           .where('createdAt', isGreaterThanOrEqualTo: today)
           .where('createdAt', isLessThan: tomorrow.add(const Duration(days: 1)))
-          .get(),
+          .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
@@ -52,7 +52,7 @@ class RutasSugeridas extends StatelessWidget {
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
           return const Center(child: Text('No hay rutas sugeridas.'));
         }
-        
+
         // Filtrar rutas
         final routes = snapshot.data!.docs.where((doc) {
           final route = doc.data() as Map<String, dynamic>;

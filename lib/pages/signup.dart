@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:nau/controller/date_selector.dart';
+import 'package:nau/utilities/date_selector.dart';
 import 'package:nau/services/auth/auth_services.dart';
 import 'package:nau/services/auth/database/database_service.dart';
 

@@ -49,7 +49,6 @@ class PerfilViewModel extends ChangeNotifier {
   UserProfile? get userProfile => userData;
 
   Future<void> loadUserData() async {
-    // Elimina el guión bajo para hacerlo público
     try {
       userData = await databaseProvider.userProfile(userId);
       _error = ProfileError.none;

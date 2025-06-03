@@ -4,6 +4,7 @@ import 'package:nau/components/my_loading_circle.dart';
 import 'package:nau/components/my_text_field.dart';
 import 'package:nau/pages/signup.dart';
 import 'package:nau/services/auth/auth_services.dart';
+import 'package:nau/utilities/forgpass.dart';
 
 /*
   LoginPage
@@ -21,7 +22,7 @@ class Login extends StatefulWidget {
   final void Function()? onTap;
 
   const Login({super.key, this.onTap});
-  
+
   @override
   State<Login> createState() => _LoginState();
 }
@@ -130,64 +131,50 @@ class _LoginState extends State<Login> {
                     hintText: "Ingresa tu contraseña...",
                     obscureText: true,
                   ),
+                  const SizedBox(height: 20.0),
                   //olvidaste tu password?
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: Text(
-                      "¿Olvidaste tu contraseña?",
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.inversePrimary,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 50.0),
-                  //sig in button
-                  MyButton(text: "Entrar", onTap: login),
-
-                  const SizedBox(height: 50.0),
-                  //no tienes cuenta? registrate
-                  // ... código anterior ...
-
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        "¿No tienes cuenta?",
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.inversePrimary,
-                        ),
-                      ),
-                      const SizedBox(width: 10.0),
-                        GestureDetector(
-                        onTap: () {
-                          if (mounted) {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => Signup(onTap: () {
-                                Navigator.pop(context);
-                              }),
-                            ),
-                          );
-                          }
-                        },
-                        // Aumentar área táctil
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          child: Text(
-                            "Regístrate ahora",
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) =>
+                                  const ForgotPasswordScreen()));
+                    },
+                    child: Container(
+                        alignment: Alignment.topRight,
+                        child: Text("¿Olvidaste tu contraseña?",
                             style: TextStyle(
                               color:
                                   Theme.of(context).colorScheme.inversePrimary,
-                              fontWeight: FontWeight.bold,
-                              decoration: TextDecoration.underline,
-                            ),
-                          ),
-                        ),
+                              fontSize: 15.0,
+                            ))),
+                  ),
+                  const SizedBox(height: 50.0),
+                  //sig in button
+                  MyButton(text: "Iniciar Sesión", onTap: login),
+
+                  const SizedBox(height: 50.0),
+                  //no tienes cuenta? registrate
+                  const SizedBox(height: 70.0),
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => Signup(onTap: () {
+                                  Navigator.pop(context);
+                                })),
+                      );
+                    },
+                    child: Text(
+                      "¿No tienes una cuenta? Regístrate",
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.inversePrimary,
+                        fontSize: 15.0,
                       ),
-                    ],
-                  )
+                    ),
+                  ),
                 ],
               ),
             ),

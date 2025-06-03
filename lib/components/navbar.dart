@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../pages/RouteEditorScreen.dart';
 import '../pages/home.dart';
 import '../pages/settings_page.dart';
 import '../pages/walletscreen.dart';
@@ -19,6 +20,7 @@ class _MainNavigationState extends State<MainNavigation> {
     const HomeScreen(),
     const Walletscreen(),
     const SettingsPage(),
+    const RouteEditorScreen(),
   ];
 
   void _onItemTapped(int index) {
@@ -49,6 +51,10 @@ class _MainNavigationState extends State<MainNavigation> {
           BottomNavigationBarItem(
             icon: Icon(Icons.settings),
             label: 'Ajustes',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.route),
+            label: 'Editor de Ruta',
           ),
         ],
       ),

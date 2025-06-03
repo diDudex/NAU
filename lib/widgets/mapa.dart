@@ -4,7 +4,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:cloud_firestore/cloud_firestore.dart'; // Asegúrate de importar el paquete de Firestore
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class MapaScreen extends StatefulWidget {
   final Map<String, dynamic>? selectedBus;
@@ -22,7 +22,6 @@ class _MapaScreenState extends State<MapaScreen> {
   Set<Polyline> _polylines = {};
   bool _loadingRoute = false;
 
-  // Reemplaza con tu API key de Google Maps
   static const String _googleMapsApiKey =
       'AIzaSyCnafhmFze96Dvw5-jPI29MdhiZWJaO45U';
   static const String _directionsBaseUrl =
@@ -57,66 +56,73 @@ class _MapaScreenState extends State<MapaScreen> {
   Future<void> _setupBusRoute() async {
     if (widget.selectedBus == null) return;
 
-    setState(() {
-      _loadingRoute = true;
-    });
+    setState(() => _loadingRoute = true);
 
-    // Coordenadas reales del autobús
-    final LatLng origin = const LatLng(25.367269591435303, -108.15921351313591);
-    final LatLng destination = const LatLng(25.461071231845242, -108.08470040559769);
-
-    // Waypoints proporcionados
     final busDoc = await FirebaseFirestore.instance
         .collection('busRoutes')
         .doc(widget.selectedBus!['id'])
         .get();
 
-    if (busDoc.exists) {
-      final routeData = busDoc.data() as Map<String, dynamic>;
+    if (!busDoc.exists) return;
 
-      // Obtener waypoints desde Firestore
-      List<LatLng> waypoints = [];
-      if (routeData['waypoints'] != null) {
-        waypoints = (routeData['waypoints'] as List<dynamic>).map((point) {
-          return LatLng(point['lat'], point['lng']);
-        }).toList();
-      }
+    final routeData = busDoc.data()!;
 
-      // Obtener ruta de Directions API con waypoints
-      final List<LatLng> routePoints =
-          await _getRoutePoints(origin, destination, waypoints);
-
-      if (routePoints.isNotEmpty) {
-        setState(() {
-          _polylines.add(
-            Polyline(
-              polylineId: const PolylineId('bus_route'),
-              points: routePoints,
-              color: Colors.blue,
-              width: 5,
-            ),
-          );
-
-          // Centrar el mapa para mostrar toda la ruta
-          _initialPosition = LatLng(
-            (origin.latitude + destination.latitude) / 2,
-            (origin.longitude + destination.longitude) / 2,
-          );
-        });
-
-        // Ajustar la vista para mostrar toda la ruta
-        _mapController?.animateCamera(
-          CameraUpdate.newLatLngBounds(
-            _boundsFromLatLngList(routePoints),
-            100.0,
-          ),
-        );
-      }
+    // 1. PRIMERO intentar usar los puntos guardados
+    if (routeData['polylinePoints'] != null) {
+      final points = (routeData['polylinePoints'] as List)
+          .map((p) => LatLng(p['lat'], p['lng']))
+          .toList();
 
       setState(() {
-        _loadingRoute = false;
+        _polylines.add(Polyline(
+          polylineId: const PolylineId('saved_route'),
+          points: points,
+          color: Colors.blue,
+          width: 5,
+        ));
+        _initialPosition = points[points.length ~/ 2]; // Punto medio
       });
+
+      _mapController?.animateCamera(
+        CameraUpdate.newLatLngBounds(_boundsFromLatLngList(points), 100),
+      );
+
+      setState(() => _loadingRoute = false);
+      return; // Termina aquí si usamos los puntos guardados
     }
+
+    // 2. SOLO si no hay puntos guardados, consultar la API
+    final origin =
+        LatLng(routeData['origin']['lat'], routeData['origin']['lng']);
+    final destination = LatLng(
+        routeData['destination']['lat'], routeData['destination']['lng']);
+
+    List<LatLng> waypoints = [];
+    if (routeData['waypoints'] != null) {
+      waypoints = (routeData['waypoints'] as List)
+          .map((p) => LatLng(p['lat'], p['lng']))
+          .toList();
+    }
+
+    final routePoints = await _getRoutePoints(origin, destination, waypoints);
+
+    if (routePoints.isNotEmpty) {
+      setState(() {
+        _polylines.add(Polyline(
+          polylineId: const PolylineId('new_route'),
+          points: routePoints,
+          color: Colors.blue,
+          width: 5,
+        ));
+        _initialPosition = routePoints[routePoints.length ~/ 2];
+      });
+
+      _mapController?.animateCamera(
+        CameraUpdate.newLatLngBounds(_boundsFromLatLngList(routePoints), 100),
+      );
+    }
+
+    setState(() => _loadingRoute = false);
   }
 
   Future<List<LatLng>> _getRoutePoints(
@@ -234,8 +240,8 @@ class _MapaScreenState extends State<MapaScreen> {
                 );
               }
             },
-            child: const Icon(Icons.alt_route),
             mini: true,
+            child: const Icon(Icons.alt_route),
           ),
         ],
       ),

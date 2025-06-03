@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
 import 'package:nau/pages/seleccion.dart';
 import 'package:nau/widgets/mapa.dart';
@@ -15,25 +16,137 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   String _searchText = '';
-  String _selectedFilter = 'Todos';
-  String _selectedSort = 'Cercanía';
+  String? _selectedFilter;
+  String? _selectedSort;
   Map<String, dynamic>? _selectedBus;
+
+  List<Map<String, dynamic>> _buses = [];
+  List<Map<String, dynamic>> _filteredBuses = [];
+  bool _isLoading = true;
+
+  Position? _currentPosition;
+
+  bool _filtersApplied = false;
 
   @override
   void initState() {
     super.initState();
-    Permission.location.request();
     _fetchBuses();
+    _getCurrentLocation();
   }
 
-  List<Map<String, dynamic>> _buses = [];
+  Future<void> _getCurrentLocation() async {
+    final status = await Permission.location.request();
+    if (!status.isGranted) return;
+
+    try {
+      final position = await Geolocator.getCurrentPosition();
+      setState(() => _currentPosition = position);
+      _applyFilters();
+    } catch (e) {
+      debugPrint("Error obteniendo ubicación: $e");
+    }
+  }
 
   Future<void> _fetchBuses() async {
-    final snapshot =
-        await FirebaseFirestore.instance.collection('busRoutes').get();
+    try {
+      final snapshot =
+          await FirebaseFirestore.instance.collection('busRoutes').get();
+
+      setState(() {
+        _buses = snapshot.docs.map((doc) {
+          final data = doc.data();
+          data['id'] = doc.id;
+          return data;
+        }).toList();
+        _isLoading = false;
+      });
+    } catch (e) {
+      debugPrint("Error al obtener buses: $e");
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al cargar rutas: $e')),
+      );
+    }
+  }
+
+  double _calculateDistance(Position position, double lat, double lng) {
+    return Geolocator.distanceBetween(
+      position.latitude,
+      position.longitude,
+      lat,
+      lng,
+    );
+  }
+
+  void _applyFilters() {
     setState(() {
-      _buses = snapshot.docs.map((doc) => doc.data()..['id'] = doc.id).toList();
+      _filtersApplied = true; // Marcamos que los filtros han sido aplicados
     });
+
+    List<Map<String, dynamic>> filtered = [..._buses];
+
+    // Solo aplicar filtros si el usuario ha interactuado
+    if (_filtersApplied) {
+      // Aplicar filtro de búsqueda
+      if (_searchText.isNotEmpty) {
+        filtered = filtered.where((bus) {
+          final nombre = (bus['nombre'] ?? '').toString().toLowerCase();
+          final search = _searchText.toLowerCase();
+          return nombre.contains(search);
+        }).toList();
+      }
+
+      // Aplicar filtro de ruta
+      if (_selectedFilter != 'Todos') {
+        filtered = filtered.where((bus) {
+          return bus['nombre'] == _selectedFilter;
+        }).toList();
+      }
+
+      // Aplicar ordenamiento
+      switch (_selectedSort) {
+        case 'Cercanía':
+          if (_currentPosition != null) {
+            filtered.sort((a, b) {
+              final aOrigin = a['origin'] ?? {};
+              final bOrigin = b['origin'] ?? {};
+              final aDistance = _calculateDistance(
+                _currentPosition!,
+                aOrigin['lat'] ?? 0.0,
+                aOrigin['log'] ??
+                    0.0, // Nota: tu BD usa 'log' en lugar de 'lng'
+              );
+              final bDistance = _calculateDistance(
+                _currentPosition!,
+                bOrigin['lat'] ?? 0.0,
+                bOrigin['log'] ?? 0.0,
+              );
+              return aDistance.compareTo(bDistance);
+            });
+          }
+          break;
+
+        case 'Tiempo':
+          filtered.sort((a, b) {
+            final aTime = _parseTime(a['horaSalida'] ?? '12:00 AM');
+            final bTime = _parseTime(b['horaSalida'] ?? '12:00 AM');
+            return aTime.hour.compareTo(bTime.hour);
+          });
+          break;
+        case 'Nombre':
+          filtered.sort((a, b) => (a['nombre'] ?? '')
+              .toString()
+              .compareTo((b['nombre'] ?? '').toString()));
+          break;
+        case 'Precio':
+          filtered
+              .sort((a, b) => (a['precio'] ?? 0).compareTo(b['precio'] ?? 0));
+          break;
+      }
+
+      setState(() => _filteredBuses = filtered);
+    }
   }
 
   Widget _buildSelectedBusCard() {
@@ -159,7 +272,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                     busData: _selectedBus!,
                                     onTicketPurchased: () {
                                       // Callback para actualizar estado si es necesario
-                                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                                      WidgetsBinding.instance
+                                          .addPostFrameCallback((_) {
                                         setState(() {});
                                       });
                                     },
@@ -195,9 +309,23 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Función auxiliar mejorada para parsear horas
-  TimeOfDay _parseTime(String timeStr) {
+  // Para manejar posibles formatos diferentes:
+  TimeOfDay _parseTime(dynamic timeValue) {
     try {
+      String timeStr = timeValue?.toString() ?? '12:00 AM';
+
+      // Intenta manejar diferentes formatos
+      if (!timeStr.contains(' ')) {
+        // Si no tiene AM/PM, asumir formato 24h
+        final parts = timeStr.split(':');
+        if (parts.length >= 2) {
+          int hour = int.tryParse(parts[0]) ?? 0;
+          int minute = int.tryParse(parts[1]) ?? 0;
+          return TimeOfDay(hour: hour, minute: minute);
+        }
+      }
+
+      // Procesar formato AM/PM estándar
       final parts = timeStr.split(' ');
       if (parts.length != 2) return const TimeOfDay(hour: 0, minute: 0);
 
@@ -216,35 +344,6 @@ class _HomeScreenState extends State<HomeScreen> {
       debugPrint("Error parsing time: $e");
       return const TimeOfDay(hour: 0, minute: 0);
     }
-  }
-
-  void _applySorting() {
-    setState(() {
-      switch (_selectedSort) {
-        case 'Cercanía':
-          // Implementa lógica de cercanía basada en ubicación
-          _buses.sort((a, b) {
-            // Aquí deberías comparar distancias
-            return 0;
-          });
-          break;
-        case 'Tiempo':
-          _buses.sort((a, b) {
-            final aTime = _parseTime(a['horaSalida'] ?? '12:00 AM');
-            final bTime = _parseTime(b['horaSalida'] ?? '12:00 AM');
-            return aTime.hour.compareTo(bTime.hour);
-          });
-          break;
-        case 'Nombre':
-          _buses.sort((a, b) => (a['nombre'] ?? '')
-              .toString()
-              .compareTo((b['nombre'] ?? '').toString()));
-          break;
-        case 'Precio':
-          _buses.sort((a, b) => (a['precio'] ?? 0).compareTo(b['precio'] ?? 0));
-          break;
-      }
-    });
   }
 
   @override
@@ -270,7 +369,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: TextField(
                   decoration: InputDecoration(
-                    hintText: 'Buscar autobús',
+                    hintText: 'Buscar autobús...',
                     prefixIcon: const Icon(Icons.search),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
@@ -281,6 +380,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   onChanged: (value) {
                     setState(() {
                       _searchText = value;
+                      _applyFilters();
                     });
                   },
                 ),
@@ -362,8 +462,10 @@ class _HomeScreenState extends State<HomeScreen> {
                                 Builder(
                                   builder: (context) {
                                     final now = DateTime.now();
-                                    final salida = _parseTime(bus['horaSalida'] ?? '12:00 AM');
-                                    final llegada = _parseTime(bus['horaLlegada'] ?? '12:00 AM');
+                                    final salida = _parseTime(
+                                        bus['horaSalida'] ?? '12:00 AM');
+                                    final llegada = _parseTime(
+                                        bus['horaLlegada'] ?? '12:00 AM');
                                     final salidaDateTime = DateTime(
                                       busDate.year,
                                       busDate.month,
@@ -392,37 +494,51 @@ class _HomeScreenState extends State<HomeScreen> {
                                     }
 
                                     if (now.isBefore(salidaDateTime)) {
-                                      final minutosSalida = salidaDateTime.difference(now).inMinutes;
-                                      return Text('Sale en: ${formatDuration(minutosSalida)}');
-                                    } else if (now.isAfter(salidaDateTime) && now.isBefore(llegadaDateTime)) {
-                                      final minutosLlegada = llegadaDateTime.difference(now).inMinutes;
-                                      final minutosSalida = now.difference(salidaDateTime).inMinutes;
+                                      final minutosSalida = salidaDateTime
+                                          .difference(now)
+                                          .inMinutes;
+                                      return Text(
+                                          'Sale en: ${formatDuration(minutosSalida)}');
+                                    } else if (now.isAfter(salidaDateTime) &&
+                                        now.isBefore(llegadaDateTime)) {
+                                      final minutosLlegada = llegadaDateTime
+                                          .difference(now)
+                                          .inMinutes;
+                                      final minutosSalida = now
+                                          .difference(salidaDateTime)
+                                          .inMinutes;
                                       return Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           Text(
                                             'Salió hace: ${formatDuration(minutosSalida)}',
-                                            style: const TextStyle(color: Colors.red),
+                                            style: const TextStyle(
+                                                color: Colors.red),
                                           ),
                                           Text(
                                             'Llega en: ${formatDuration(minutosLlegada)}',
-                                            style: const TextStyle(color: Colors.orange),
+                                            style: const TextStyle(
+                                                color: Colors.orange),
                                           ),
                                         ],
                                       );
                                     } else if (now.isAfter(llegadaDateTime)) {
                                       return Text(
                                         'Llegó a las: ${bus['horaLlegada'] ?? 'N/A'}',
-                                        style: const TextStyle(color: Colors.grey),
+                                        style:
+                                            const TextStyle(color: Colors.grey),
                                       );
                                     } else {
-                                      return Text('Hora salida: ${bus['horaSalida'] ?? 'N/A'}');
+                                      return Text(
+                                          'Hora salida: ${bus['horaSalida'] ?? 'N/A'}');
                                     }
                                   },
                                 ),
                                 Text('Fecha: $fechaStr'),
                                 if (busDate.day == DateTime.now().day + 1)
-                                  const Text('(Mañana)', style: TextStyle(color: Colors.green)),
+                                  const Text('(Mañana)',
+                                      style: TextStyle(color: Colors.green)),
                               ],
                             ),
                             onTap: () {
@@ -440,138 +556,159 @@ class _HomeScreenState extends State<HomeScreen> {
               Padding(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
+                child: Row(
+                  children: [
+                    // Filtro por ruta
+                    Expanded(
+                        child: DropdownButtonFormField<String>(
+                        value: _selectedFilter,
+                        hint: const Text('Buses'),
+                        decoration: InputDecoration(
+                          contentPadding:
+                            const EdgeInsets.symmetric(horizontal: 12),
+                          border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide.none,
+                          ),
+                          filled: true,
+                          fillColor: Theme.of(context).colorScheme.surface,
+                        ),
+                        items: [
+                          const DropdownMenuItem(
+                          value: 'Todos',
+                          child: Text('Todos los buses'),
+                          ),
+                          const DropdownMenuItem(
+                          value: 'Ninguno',
+                          child: Text('No mostrar buses'),
+                          ),
+                          ..._buses
+                            .map((bus) => bus['nombre'] as String)
+                            .toSet()
+                            .map((nombre) => DropdownMenuItem(
+                              value: nombre,
+                              child: Text(nombre),
+                              ))
+                            .toList(),
+                        ],
+                        onChanged: (value) {
+                          setState(() {
+                          _selectedFilter = value!;
+                          if (_selectedFilter == 'Ninguno') {
+                            _filteredBuses = [];
+                          } else {
+                            _applyFilters();
+                          }
+                          });
+                        },
                       ),
-                    ],
-                  ),
-                  child: Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    child: Row(
-                      children: [
-                        // Filtro por ruta
-                        Expanded(
-                          child: DropdownButtonFormField<String>(
-                            value: _selectedFilter,
-                            decoration: InputDecoration(
-                              contentPadding:
-                                  const EdgeInsets.symmetric(horizontal: 12),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: BorderSide.none,
-                              ),
-                              filled: true,
-                              fillColor:
-                                  Theme.of(context).colorScheme.background,
-                            ),
-                            icon: const Icon(Icons.filter_alt_outlined),
-                            borderRadius: BorderRadius.circular(12),
-                            items: [
-                              'Todos',
-                              ..._buses
-                                  .map((bus) => bus['nombre'] as String)
-                                  .toSet()
-                                  .toList()
-                            ].map((f) {
-                              return DropdownMenuItem(
-                                value: f,
-                                child: Text(
-                                  f,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(fontSize: 10),
-                                ),
-                              );
-                            }).toList(),
-                            onChanged: (value) {
-                              setState(() {
-                                _selectedFilter = value!;
-                              });
-                            },
-                          ),
-                        ),
-
-                        const SizedBox(width: 12),
-
-                        // Ordenamiento
-                        Expanded(
-                          child: DropdownButtonFormField<String>(
-                            value: _selectedSort,
-                            decoration: InputDecoration(
-                              contentPadding:
-                                  const EdgeInsets.symmetric(horizontal: 12),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: BorderSide.none,
-                              ),
-                              filled: true,
-                              fillColor:
-                                  Theme.of(context).colorScheme.background,
-                            ),
-                            icon: const Icon(Icons.sort),
-                            borderRadius: BorderRadius.circular(12),
-                            items: [
-                              DropdownMenuItem(
-                                value: 'Cercanía',
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.near_me, size: 18),
-                                    const SizedBox(width: 8),
-                                    const Text('Cercanía'),
-                                  ],
-                                ),
-                              ),
-                              DropdownMenuItem(
-                                value: 'Tiempo',
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.access_time, size: 18),
-                                    const SizedBox(width: 8),
-                                    const Text('Hora salida'),
-                                  ],
-                                ),
-                              ),
-                              DropdownMenuItem(
-                                value: 'Nombre',
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.sort_by_alpha, size: 18),
-                                    const SizedBox(width: 8),
-                                    const Text('Nombre'),
-                                  ],
-                                ),
-                              ),
-                              DropdownMenuItem(
-                                value: 'Precio',
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.attach_money, size: 18),
-                                    const SizedBox(width: 8),
-                                    const Text('Precio'),
-                                  ],
-                                ),
-                              ),
-                            ],
-                            onChanged: (value) {
-                              setState(() {
-                                _selectedSort = value!;
-                                _applySorting();
-                              });
-                            },
-                          ),
-                        ),
-                      ],
                     ),
-                  ),
+                    const SizedBox(width: 12),
+                    // Ordenamiento
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value: _selectedSort,
+                        hint: const Row(
+                          children: [
+                          Icon(Icons.filter_list, size: 18),
+                          SizedBox(width: 8),
+                          Text('Filtros'),
+                          ],
+                        ),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'Cercanía',
+                            child: Row(
+                              children: [
+                                Icon(Icons.near_me, size: 18),
+                                SizedBox(width: 8),
+                                Text('Cercanía'),
+                              ],
+                            ),
+                          ),
+                          DropdownMenuItem(
+                            value: 'Tiempo',
+                            child: Row(
+                              children: [
+                                Icon(Icons.access_time, size: 18),
+                                SizedBox(width: 8),
+                                Text('Hora salida'),
+                              ],
+                            ),
+                          ),
+                          DropdownMenuItem(
+                            value: 'Nombre',
+                            child: Row(
+                              children: [
+                                Icon(Icons.sort_by_alpha, size: 18),
+                                SizedBox(width: 8),
+                                Text('Nombre'),
+                              ],
+                            ),
+                          ),
+                          DropdownMenuItem(
+                            value: 'Precio',
+                            child: Row(
+                              children: [
+                                Icon(Icons.attach_money, size: 18),
+                                SizedBox(width: 8),
+                                Text('Precio'),
+                              ],
+                            ),
+                          ),
+                        ],
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedSort = value!;
+                            _applyFilters();
+                          });
+                        },
+                      ),
+                    ),
+                  ],
                 ),
               ),
+              // Lista de resultados
+              _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: _filteredBuses.length,
+                      itemBuilder: (context, index) {
+                        final bus = _filteredBuses[index];
+                        return Card(
+                          margin: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
+                          child: ListTile(
+                            leading: const Icon(Icons.directions_bus, size: 36),
+                            title: Text(bus['nombre'] ?? 'Ruta sin nombre'),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Salida: ${bus['horaSalida'] ?? 'N/A'}'),
+                                Text('Llegada: ${bus['horaLlegada'] ?? 'N/A'}'),
+                                Text(
+                                    'Precio: \$${(num.tryParse(bus['precio']?.toString() ?? '')?.toStringAsFixed(2) ?? '0.00')}'),
+                              ],
+                            ),
+                            trailing: const Icon(Icons.chevron_right),
+                            onTap: () {
+                              setState(() {
+                                _selectedBus = bus;
+                              });
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      MapaScreen(selectedBus: bus),
+                                ),
+                              );
+                            },
+                          ),
+                        );
+                      },
+                    ),
 
               // Mapa de rutas
               const SizedBox(
@@ -602,6 +739,15 @@ class _HomeScreenState extends State<HomeScreen> {
                         setState(() {
                           _selectedBus = bus;
                         });
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => SeatSelectionScreen(
+                              busData: bus,
+                              onTicketPurchased: _fetchBuses,
+                            ),
+                          ),
+                        );
                       },
                     ),
                   ],

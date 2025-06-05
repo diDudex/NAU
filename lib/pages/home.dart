@@ -40,54 +40,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _fetchBusesWithDetails() async {
-    try {
-      // Obtener todos los buses
-      final busesSnapshot = await _firestore.collection('Bus').get();
-
-      // Para cada bus, obtener sus datos relacionados
-      List<Map<String, dynamic>> busesWithDetails = [];
-
-      for (var busDoc in busesSnapshot.docs) {
-        final busData = busDoc.data();
-        busData['id'] = busDoc.id;
-
-        // Obtener datos de la ruta asociada
-        if (busData['rutaid'] != null) {
-          final rutaDoc = await _firestore
-              .collection('Rutas')
-              .doc(busData['rutaid'])
-              .get();
-          if (rutaDoc.exists) {
-            busData['ruta'] = rutaDoc.data();
-          }
-        }
-
-        // Obtener datos del horario asociado
-        if (busData['horarios'] is List &&
-            (busData['horarios'] as List).isNotEmpty) {
-          final horarioId = (busData['horarios'] as List).first;
-          final horarioDoc =
-              await _firestore.collection('Horarios').doc(horarioId).get();
-          if (horarioDoc.exists) {
-            busData['horario'] = horarioDoc.data();
-          }
-        }
-
-        busesWithDetails.add(busData);
-      }
-
-      setState(() {
-        _buses = busesWithDetails;
-      });
-    } catch (e) {
-      debugPrint("Error al obtener buses con detalles: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al cargar buses: $e')),
-      );
-    }
-  }
-
   Widget _buildSelectedBusCard() {
     if (_selectedBus == null) return const SizedBox.shrink();
 
@@ -137,7 +89,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          _selectedBus!['nombre'] ?? 'Sin nombre',
+                          _selectedBus!['ruta']?['nombre'] ?? 'Sin nombre',
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
@@ -145,13 +97,13 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Hora salida: ${_selectedBus!['horaSalida'] ?? 'N/A'}',
+                          'Hora salida: ${_selectedBus!['horario'] != null ? _selectedBus!['horario']['horaInicio'] ?? 'N/A' : 'N/A'}',
                           style: TextStyle(
                             color: Colors.grey[600],
                           ),
                         ),
                         Text(
-                          'Hora llegada: ${_selectedBus!['horaLlegada'] ?? 'N/A'}',
+                          'Hora llegada: ${_selectedBus!['horario'] != null ? _selectedBus!['horario']['horaFin'] ?? 'N/A' : 'N/A'}',
                           style: TextStyle(
                             color: Colors.grey[600],
                           ),
@@ -248,6 +200,49 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Future<void> _fetchBusesWithDetails() async {
+    try {
+      // Obtener todos los buses
+      final busesSnapshot = await _firestore.collection('Bus').get();
+      
+      // Para cada bus, obtener sus datos relacionados
+      List<Map<String, dynamic>> busesWithDetails = [];
+      
+      for (var busDoc in busesSnapshot.docs) {
+        final busData = busDoc.data();
+        busData['id'] = busDoc.id;
+        
+        // Obtener datos de la ruta asociada
+        if (busData['rutasid'] != null) {
+          final rutaDoc = await _firestore.collection('Rutas').doc(busData['rutasid']).get();
+          if (rutaDoc.exists) {
+            busData['ruta'] = rutaDoc.data();
+          }
+        }
+        
+        // Obtener datos del horario asociado
+        if (busData['horarios'] is List && (busData['horarios'] as List).isNotEmpty) {
+          final horarioId = (busData['horarios'] as List).first;
+          final horarioDoc = await _firestore.collection('Horarios').doc(horarioId).get();
+          if (horarioDoc.exists) {
+            busData['horario'] = horarioDoc.data();
+          }
+        }
+        
+        busesWithDetails.add(busData);
+      }
+      
+      setState(() {
+        _buses = busesWithDetails;
+      });
+    } catch (e) {
+      debugPrint("Error al obtener buses con detalles: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al cargar buses: $e')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -267,31 +262,26 @@ class _HomeScreenState extends State<HomeScreen> {
           physics: const NeverScrollableScrollPhysics(),
           padding: EdgeInsets.zero,
           children: [
-            // Barra de búsqueda
-            Column(children: [
-              Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: TextField(
-                  decoration: InputDecoration(
-                    hintText: 'Buscar autobús...',
-                    prefixIcon: const Icon(Icons.search),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    filled: true,
-                    fillColor: Theme.of(context).colorScheme.surface,
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: TextField(
+                decoration: InputDecoration(
+                  hintText: 'Buscar autobús...',
+                  prefixIcon: const Icon(Icons.search),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                  onChanged: (value) {
-                    setState(() {
-                      _searchText = value.trim();
-                    });
-                  },
+                  filled: true,
+                  fillColor: Theme.of(context).colorScheme.surface,
                 ),
+                onChanged: (value) {
+                  setState(() {
+                    _searchText = value.trim();
+                  });
+                },
               ),
-            ]),
+            ),
 
-            // Lista pequeña de resultados de búsqueda
             if (_searchText.isNotEmpty)
               Builder(
                 builder: (context) {
@@ -308,18 +298,15 @@ class _HomeScreenState extends State<HomeScreen> {
                             busNum.contains(search);
                       })
                       .where((bus) {
-                        // Filtro por horarios disponibles
                         final horario = bus['horario'];
                         if (horario == null) return false;
 
-                        final fechaStr = horario['fecha'];
                         final estado = bus['estado']?.toString().toLowerCase();
+                        if (estado != 'mantenimiento') return true;
 
-                        if (estado != 'activo') return false;
-
-                        final fecha = fechaStr is Timestamp
-                            ? fechaStr.toDate()
-                            : DateTime.tryParse(fechaStr.toString());
+                        final fecha = horario['fecha'] is Timestamp
+                          ? (horario['fecha'] as Timestamp).toDate()
+                          : DateTime.tryParse(horario['fecha'].toString());
 
                         if (fecha == null) return false;
 
@@ -327,13 +314,12 @@ class _HomeScreenState extends State<HomeScreen> {
                         final today = DateTime(now.year, now.month, now.day);
                         final tomorrow = today.add(const Duration(days: 1));
 
-                        // Mostrar buses de hoy o mañana
                         return (fecha.year == today.year &&
-                                fecha.month == today.month &&
-                                fecha.day == today.day) ||
-                            (fecha.year == tomorrow.year &&
-                                fecha.month == tomorrow.month &&
-                                fecha.day == tomorrow.day);
+                            fecha.month == today.month &&
+                            fecha.day == today.day) ||
+                          (fecha.year == tomorrow.year &&
+                            fecha.month == tomorrow.month &&
+                            fecha.day == tomorrow.day);
                       })
                       .take(3)
                       .toList();
@@ -381,7 +367,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               children: [
                                 if (horario != null) ...[
                                   Text(
-                                      'Salida: ${horario['horainicio'] ?? 'N/A'}'),
+                                      'Salida: ${horario['horaInicio'] ?? 'N/A'}'),
                                   Text(
                                       'Llegada: ${horario['horaFin'] ?? 'N/A'}'),
                                 ],
@@ -389,9 +375,11 @@ class _HomeScreenState extends State<HomeScreen> {
                                   Text(
                                       'Fecha: ${DateFormat('dd/MM/yyyy').format(fechaViaje)}'),
                                 if (fechaViaje != null &&
-                                    fechaViaje.day == DateTime.now().day + 1)
+                                  fechaViaje.year == DateTime.now().year &&
+                                  fechaViaje.month == DateTime.now().month &&
+                                  fechaViaje.day == DateTime.now().add(const Duration(days: 1)).day)
                                   const Text('(Mañana)',
-                                      style: TextStyle(color: Colors.green)),
+                                    style: TextStyle(color: Colors.green)),
                                 Text('Estado: ${bus['estado'] ?? 'N/A'}'),
                               ],
                             ),
@@ -409,7 +397,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 },
               ),
 
-            // Mapa de rutas
+            // Mapa
             SizedBox(
               height: 380,
               child: MapaScreen(
@@ -418,7 +406,6 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
 
-            // Parte inferior (rutas sugeridas)
             SizedBox(
               height: 400,
               child: SingleChildScrollView(
@@ -427,7 +414,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Mostrar autobús seleccionado
                       _buildSelectedBusCard(),
                       const SizedBox(height: 16),
                       const Text(

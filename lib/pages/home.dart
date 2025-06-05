@@ -17,16 +17,14 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   String _searchText = '';
   Map<String, dynamic>? _selectedBus;
-
   List<Map<String, dynamic>> _buses = [];
-
-  // ignore: unused_field
   Position? _currentPosition;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   @override
   void initState() {
     super.initState();
-    _fetchBuses();
+    _fetchBusesWithDetails();
     _getCurrentLocation();
   }
 
@@ -42,33 +40,52 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _fetchBuses() async {
+  Future<void> _fetchBusesWithDetails() async {
     try {
-      final snapshot = await FirebaseFirestore.instance.collection('Bus').get();
+      // Obtener todos los buses
+      final busesSnapshot = await _firestore.collection('Bus').get();
+
+      // Para cada bus, obtener sus datos relacionados
+      List<Map<String, dynamic>> busesWithDetails = [];
+
+      for (var busDoc in busesSnapshot.docs) {
+        final busData = busDoc.data();
+        busData['id'] = busDoc.id;
+
+        // Obtener datos de la ruta asociada
+        if (busData['rutaid'] != null) {
+          final rutaDoc = await _firestore
+              .collection('Rutas')
+              .doc(busData['rutaid'])
+              .get();
+          if (rutaDoc.exists) {
+            busData['ruta'] = rutaDoc.data();
+          }
+        }
+
+        // Obtener datos del horario asociado
+        if (busData['horarios'] is List &&
+            (busData['horarios'] as List).isNotEmpty) {
+          final horarioId = (busData['horarios'] as List).first;
+          final horarioDoc =
+              await _firestore.collection('Horarios').doc(horarioId).get();
+          if (horarioDoc.exists) {
+            busData['horario'] = horarioDoc.data();
+          }
+        }
+
+        busesWithDetails.add(busData);
+      }
 
       setState(() {
-        _buses = snapshot.docs.map((doc) {
-          final data = doc.data();
-          data['id'] = doc.id;
-          return data;
-        }).toList();
+        _buses = busesWithDetails;
       });
     } catch (e) {
-      debugPrint("Error al obtener buses: $e");
+      debugPrint("Error al obtener buses con detalles: $e");
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al cargar rutas: $e')),
+        SnackBar(content: Text('Error al cargar buses: $e')),
       );
     }
-  }
-
-  // ignore: unused_element
-  double _calculateDistance(Position position, double lat, double lng) {
-    return Geolocator.distanceBetween(
-      position.latitude,
-      position.longitude,
-      lat,
-      lng,
-    );
   }
 
   Widget _buildSelectedBusCard() {
@@ -231,43 +248,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Para manejar posibles formatos diferentes:
-  TimeOfDay _parseTime(dynamic timeValue) {
-    try {
-      String timeStr = timeValue?.toString() ?? '12:00 AM';
-
-      // Intenta manejar diferentes formatos
-      if (!timeStr.contains(' ')) {
-        // Si no tiene AM/PM, asumir formato 24h
-        final parts = timeStr.split(':');
-        if (parts.length >= 2) {
-          int hour = int.tryParse(parts[0]) ?? 0;
-          int minute = int.tryParse(parts[1]) ?? 0;
-          return TimeOfDay(hour: hour, minute: minute);
-        }
-      }
-
-      // Procesar formato AM/PM estándar
-      final parts = timeStr.split(' ');
-      if (parts.length != 2) return const TimeOfDay(hour: 0, minute: 0);
-
-      final timePart = parts[0].split(':');
-      if (timePart.length < 2) return const TimeOfDay(hour: 0, minute: 0);
-
-      int hour = int.parse(timePart[0]);
-      final minute = int.parse(timePart[1]);
-      final period = parts[1].toUpperCase();
-
-      if (period == 'PM' && hour != 12) hour += 12;
-      if (period == 'AM' && hour == 12) hour = 0;
-
-      return TimeOfDay(hour: hour, minute: minute);
-    } catch (e) {
-      debugPrint("Error parsing time: $e");
-      return const TimeOfDay(hour: 0, minute: 0);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -283,9 +263,9 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       body: SafeArea(
         child: ListView(
-          padding: EdgeInsets.zero,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
+          padding: EdgeInsets.zero,
           children: [
             // Barra de búsqueda
             Column(children: [
@@ -304,48 +284,42 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   onChanged: (value) {
                     setState(() {
-                      _searchText = value
-                          .trim(); // Usamos trim() para eliminar espacios en blanco
+                      _searchText = value.trim();
                     });
                   },
                 ),
               ),
             ]),
+
             // Lista pequeña de resultados de búsqueda
             if (_searchText.isNotEmpty)
               Builder(
                 builder: (context) {
                   final filteredBuses = _buses
                       .where((bus) {
-                        final rutasId =
-                            (bus['rutasid'] ?? '').toString().toLowerCase();
+                        final rutaNombre =
+                            bus['ruta']?['nombre']?.toString().toLowerCase() ??
+                                '';
+                        final busNum =
+                            bus['numBus']?.toString().toLowerCase() ?? '';
                         final search = _searchText.toLowerCase();
-                        return rutasId.split('-').any(
-                                (part) => part.trim().startsWith(search)) ||
-                            rutasId.contains(search);
+
+                        return rutaNombre.contains(search) ||
+                            busNum.contains(search);
                       })
                       .where((bus) {
-                        // Obtener la hora de llegada desde horarios['horaLlegada']
-                        dynamic horariosRaw = bus['horarios'];
-                        String? horaLlegadaStr;
-                        if (horariosRaw is Map<String, dynamic>) {
-                          horaLlegadaStr = horariosRaw['horaLlegada'];
-                        } else if (horariosRaw is List &&
-                            horariosRaw.isNotEmpty) {
-                          // Si es una lista, intenta tomar el primer elemento si es un mapa
-                          final first = horariosRaw.first;
-                          if (first is Map<String, dynamic>) {
-                            horaLlegadaStr = first['horaLlegada'];
-                          }
-                        }
-                        if (horaLlegadaStr == null) return false;
+                        // Filtro por horarios disponibles
+                        final horario = bus['horario'];
+                        if (horario == null) return false;
 
-                        // Usar 'fecha' en vez de 'createdAt'
-                        final fecha = bus['fecha'] != null
-                            ? (bus['fecha'] is Timestamp
-                                ? (bus['fecha'] as Timestamp).toDate()
-                                : DateTime.tryParse(bus['fecha'].toString()))
-                            : null;
+                        final fechaStr = horario['fecha'];
+                        final estado = bus['estado']?.toString().toLowerCase();
+
+                        if (estado != 'activo') return false;
+
+                        final fecha = fechaStr is Timestamp
+                            ? fechaStr.toDate()
+                            : DateTime.tryParse(fechaStr.toString());
 
                         if (fecha == null) return false;
 
@@ -353,26 +327,13 @@ class _HomeScreenState extends State<HomeScreen> {
                         final today = DateTime(now.year, now.month, now.day);
                         final tomorrow = today.add(const Duration(days: 1));
 
-                        if (fecha.year == tomorrow.year &&
-                            fecha.month == tomorrow.month &&
-                            fecha.day == tomorrow.day) {
-                          return true;
-                        }
-
-                        if (fecha.year == now.year &&
-                            fecha.month == now.month &&
-                            fecha.day == now.day) {
-                          final llegada = _parseTime(horaLlegadaStr);
-                          final llegadaDateTime = DateTime(
-                              fecha.year,
-                              fecha.month,
-                              fecha.day,
-                              llegada.hour,
-                              llegada.minute);
-                          return llegadaDateTime.isAfter(now);
-                        }
-
-                        return false;
+                        // Mostrar buses de hoy o mañana
+                        return (fecha.year == today.year &&
+                                fecha.month == today.month &&
+                                fecha.day == today.day) ||
+                            (fecha.year == tomorrow.year &&
+                                fecha.month == tomorrow.month &&
+                                fecha.day == tomorrow.day);
                       })
                       .take(3)
                       .toList();
@@ -391,29 +352,16 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: filteredBuses.map((bus) {
-                          // Obtener la fecha desde horarios['fecha'] si existe, si no, usar bus['fecha']
-                          DateTime? busDate;
-                          dynamic horariosRaw = bus['horarios'];
-                          if (horariosRaw is Map<String, dynamic> &&
-                              horariosRaw['fecha'] != null) {
-                            if (horariosRaw['fecha'] is Timestamp) {
-                              busDate =
-                                  (horariosRaw['fecha'] as Timestamp).toDate();
-                            } else if (horariosRaw['fecha'] is String) {
-                              busDate = DateTime.tryParse(horariosRaw['fecha']);
-                            }
-                          } else if (horariosRaw is List &&
-                              horariosRaw.isNotEmpty) {
-                            final first = horariosRaw.first;
-                            if (first is Map<String, dynamic> &&
-                                first['fecha'] != null) {
-                              if (first['fecha'] is Timestamp) {
-                                busDate =
-                                    (first['fecha'] as Timestamp).toDate();
-                              } else if (first['fecha'] is String) {
-                                busDate = DateTime.tryParse(first['fecha']);
-                              }
-                            }
+                          final horario = bus['horario'];
+                          final ruta = bus['ruta'];
+
+                          DateTime? fechaViaje;
+                          if (horario?['fecha'] is Timestamp) {
+                            fechaViaje =
+                                (horario!['fecha'] as Timestamp).toDate();
+                          } else if (horario?['fecha'] != null) {
+                            fechaViaje =
+                                DateTime.tryParse(horario!['fecha'].toString());
                           }
 
                           return ListTile(
@@ -423,116 +371,28 @@ class _HomeScreenState extends State<HomeScreen> {
                               height: 32,
                               width: 32,
                             ),
-                            title: FutureBuilder<DocumentSnapshot>(
-                              future: FirebaseFirestore.instance
-                                  .collection('Rutas')
-                                  .doc(bus['rutasid'])
-                                  .get(),
-                              builder: (context, snapshot) {
-                                if (snapshot.connectionState ==
-                                    ConnectionState.waiting) {
-                                  return const Text('Cargando ruta...');
-                                }
-                                if (!snapshot.hasData ||
-                                    !snapshot.data!.exists) {
-                                  return Text(bus['nombre'] ?? '');
-                                }
-                                final rutaData = snapshot.data!.data()
-                                    as Map<String, dynamic>?;
-                                final rutaNombre =
-                                    rutaData?['nombre'] ?? bus['nombre'] ?? '';
-                                return Text(rutaNombre);
-                              },
+                            title: Text(
+                              ruta?['nombre'] ?? 'Autobús ${bus['numBus']}',
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.bold),
                             ),
                             subtitle: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Builder(
-                                  builder: (context) {
-                                    final now = DateTime.now();
-                                    final salida = _parseTime(
-                                        bus['horaSalida'] ?? '12:00 AM');
-                                    final llegada = _parseTime(
-                                        bus['horaLlegada'] ?? '12:00 AM');
-                                    final salidaDateTime = busDate != null
-                                        ? DateTime(
-                                            busDate.year,
-                                            busDate.month,
-                                            busDate.day,
-                                            salida.hour,
-                                            salida.minute,
-                                          )
-                                        : DateTime.now();
-                                    final llegadaDateTime = busDate != null
-                                        ? DateTime(
-                                            busDate.year,
-                                            busDate.month,
-                                            busDate.day,
-                                            llegada.hour,
-                                            llegada.minute,
-                                          )
-                                        : DateTime.now();
-
-                                    String formatDuration(int totalMinutes) {
-                                      final hours = totalMinutes ~/ 60;
-                                      final minutes = totalMinutes % 60;
-                                      if (hours > 0 && minutes > 0) {
-                                        return '$hours hora${hours > 1 ? 's' : ''} $minutes minutos';
-                                      } else if (hours > 0) {
-                                        return '$hours hora${hours > 1 ? 's' : ''}';
-                                      } else {
-                                        return '$minutes minutos';
-                                      }
-                                    }
-
-                                    if (now.isBefore(salidaDateTime)) {
-                                      final minutosSalida = salidaDateTime
-                                          .difference(now)
-                                          .inMinutes;
-                                      return Text(
-                                          'Sale en: ${formatDuration(minutosSalida)}');
-                                    } else if (now.isAfter(salidaDateTime) &&
-                                        now.isBefore(llegadaDateTime)) {
-                                      final minutosLlegada = llegadaDateTime
-                                          .difference(now)
-                                          .inMinutes;
-                                      final minutosSalida = now
-                                          .difference(salidaDateTime)
-                                          .inMinutes;
-                                      return Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            'Salió hace: ${formatDuration(minutosSalida)}',
-                                            style: const TextStyle(
-                                                color: Colors.red),
-                                          ),
-                                          Text(
-                                            'Llega en: ${formatDuration(minutosLlegada)}',
-                                            style: const TextStyle(
-                                                color: Colors.orange),
-                                          ),
-                                        ],
-                                      );
-                                    } else if (now.isAfter(llegadaDateTime)) {
-                                      return Text(
-                                        'Llegó a las: ${bus['horaLlegada'] ?? 'N/A'}',
-                                        style:
-                                            const TextStyle(color: Colors.grey),
-                                      );
-                                    } else {
-                                      return Text(
-                                          'Hora salida: ${bus['horaSalida'] ?? 'N/A'}');
-                                    }
-                                  },
-                                ),
-                                Text(
-                                    'Fecha: ${busDate != null ? DateFormat('dd/MM/yyyy').format(busDate) : 'N/A'}'),
-                                if (busDate != null &&
-                                    busDate.day == DateTime.now().day + 1)
+                                if (horario != null) ...[
+                                  Text(
+                                      'Salida: ${horario['horainicio'] ?? 'N/A'}'),
+                                  Text(
+                                      'Llegada: ${horario['horaFin'] ?? 'N/A'}'),
+                                ],
+                                if (fechaViaje != null)
+                                  Text(
+                                      'Fecha: ${DateFormat('dd/MM/yyyy').format(fechaViaje)}'),
+                                if (fechaViaje != null &&
+                                    fechaViaje.day == DateTime.now().day + 1)
                                   const Text('(Mañana)',
                                       style: TextStyle(color: Colors.green)),
+                                Text('Estado: ${bus['estado'] ?? 'N/A'}'),
                               ],
                             ),
                             onTap: () {
@@ -550,9 +410,12 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
 
             // Mapa de rutas
-            const SizedBox(
+            SizedBox(
               height: 380,
-              child: MapaScreen(),
+              child: MapaScreen(
+                selectedBus: _selectedBus,
+                currentPosition: _currentPosition,
+              ),
             ),
 
             // Parte inferior (rutas sugeridas)

@@ -8,8 +8,13 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 class MapaScreen extends StatefulWidget {
   final Map<String, dynamic>? selectedBus;
+  final Position? currentPosition;
 
-  const MapaScreen({super.key, this.selectedBus});
+  const MapaScreen({
+    super.key, 
+    this.selectedBus,
+    this.currentPosition,
+  });
 
   @override
   _MapaScreenState createState() => _MapaScreenState();
@@ -17,122 +22,150 @@ class MapaScreen extends StatefulWidget {
 
 class _MapaScreenState extends State<MapaScreen> {
   GoogleMapController? _mapController;
-  LatLng _initialPosition =
-      const LatLng(25.367269591435303, -108.15921351313591);
+  late LatLng _initialPosition;
   Set<Polyline> _polylines = {};
   bool _loadingRoute = false;
+  bool _showUserLocation = false;
 
-  static const String _googleMapsApiKey =
-      'AIzaSyCnafhmFze96Dvw5-jPI29MdhiZWJaO45U';
-  static const String _directionsBaseUrl =
-      'https://maps.googleapis.com/maps/api/directions/json';
+  static const String _googleMapsApiKey = 'AIzaSyCnafhmFze96Dvw5-jPI29MdhiZWJaO45U';
+  static const String _directionsBaseUrl = 'https://maps.googleapis.com/maps/api/directions/json';
 
   @override
   void initState() {
     super.initState();
-    _obtenerUbicacionActual();
+    _initialPosition = widget.currentPosition != null 
+      ? LatLng(widget.currentPosition!.latitude, widget.currentPosition!.longitude)
+      : const LatLng(25.367269591435303, -108.15921351313591);
+    
     _setupBusRoute();
   }
 
-  Future<void> _obtenerUbicacionActual() async {
-    var permiso = await Permission.location.request();
-
-    if (permiso.isGranted) {
-      Position posicion = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
-
-      // Solo mueve la cámara a la ubicación actual, no agrega marcador
-      _mapController?.animateCamera(
-        CameraUpdate.newLatLng(
-          LatLng(posicion.latitude, posicion.longitude),
-        ),
-      );
+  Future<void> _toggleUserLocation() async {
+    if (!_showUserLocation) {
+      final status = await Permission.location.request();
+      if (status.isGranted) {
+        try {
+          final position = await Geolocator.getCurrentPosition();
+          setState(() {
+            _showUserLocation = true;
+            _mapController?.animateCamera(
+              CameraUpdate.newLatLng(
+                LatLng(position.latitude, position.longitude),
+              ),
+            );
+          });
+        } catch (e) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error obteniendo ubicación: $e')),
+          );
+        }
+      }
     } else {
-      print("Permiso denegado");
+      setState(() {
+        _showUserLocation = false;
+      });
     }
   }
 
   Future<void> _setupBusRoute() async {
-    if (widget.selectedBus == null) return;
+    if (widget.selectedBus == null || widget.selectedBus!['rutaid'] == null) return;
 
     setState(() => _loadingRoute = true);
 
-    final busDoc = await FirebaseFirestore.instance
-        .collection('busRoutes')
-        .doc(widget.selectedBus!['id'])
-        .get();
+    try {
+      final routeDoc = await FirebaseFirestore.instance
+          .collection('Rutas')
+          .doc(widget.selectedBus!['rutaid'])
+          .get();
 
-    if (!busDoc.exists) return;
+      if (!routeDoc.exists) return;
 
-    final routeData = busDoc.data()!;
+      final routeData = routeDataWithDefaults(routeDoc.data()!);
 
-    // 1. PRIMERO intentar usar los puntos guardados
-    if (routeData['polylinePoints'] != null) {
-      final points = (routeData['polylinePoints'] as List)
-          .map((p) => LatLng(p['lat'], p['lng']))
-          .toList();
+      // 1. Intentar usar polylinePoints si existen
+      if (routeData['polyline'] != null && routeData['polyline'].isNotEmpty) {
+        final points = routeData['polyline'].map<LatLng>((p) => 
+          LatLng(p['lat'], p['lng'])
+        ).toList();
 
-      setState(() {
-        _polylines.add(Polyline(
-          polylineId: const PolylineId('saved_route'),
-          points: points,
-          color: Colors.blue,
-          width: 5,
-        ));
-        _initialPosition = points[points.length ~/ 2]; // Punto medio
-      });
+        _updateMapWithRoute(points);
+        setState(() => _loadingRoute = false);
+        return;
+      }
 
-      _mapController?.animateCamera(
-        CameraUpdate.newLatLngBounds(_boundsFromLatLngList(points), 100),
+      // 2. Si no hay polyline, usar la API de direcciones
+      final origin = LatLng(
+        routeData['origin']['lat'], 
+        routeData['origin']['lng']
+      );
+      final destination = LatLng(
+        routeData['destination']['lat'], 
+        routeData['destination']['lng']
       );
 
+      List<LatLng> waypoints = [];
+      if (routeData['waypoints'] != null) {
+        waypoints = routeData['waypoints'].map<LatLng>((p) => 
+          LatLng(p['lat'], p['lng'])
+        ).toList();
+      }
+
+      final routePoints = await _getRoutePoints(origin, destination, waypoints);
+      _updateMapWithRoute(routePoints);
+      
+    } catch (e) {
+      debugPrint('Error configurando ruta: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al cargar la ruta: $e')),
+      );
+    } finally {
       setState(() => _loadingRoute = false);
-      return; // Termina aquí si usamos los puntos guardados
     }
+  }
 
-    // 2. SOLO si no hay puntos guardados, consultar la API
-    final origin =
-        LatLng(routeData['origin']['lat'], routeData['origin']['lng']);
-    final destination = LatLng(
-        routeData['destination']['lat'], routeData['destination']['lng']);
+  Map<String, dynamic> routeDataWithDefaults(Map<String, dynamic> routeData) {
+    // Asegurar que todos los campos necesarios existan con valores por defecto
+    return {
+      'nombre': routeData['nombre'] ?? 'Ruta sin nombre',
+      'origin': routeData['origin'] ?? {'lat': 25.367269, 'lng': -108.159213},
+      'destination': routeData['destination'] ?? {'lat': 25.380139, 'lng': -108.128655},
+      'waypoints': routeData['waypoints'] ?? [],
+      'polyline': routeData['polyline'] ?? [],
+      'priceList': routeData['priceList'] ?? [],
+    };
+  }
 
-    List<LatLng> waypoints = [];
-    if (routeData['waypoints'] != null) {
-      waypoints = (routeData['waypoints'] as List)
-          .map((p) => LatLng(p['lat'], p['lng']))
-          .toList();
-    }
+  void _updateMapWithRoute(List<LatLng> routePoints) {
+    if (routePoints.isEmpty) return;
 
-    final routePoints = await _getRoutePoints(origin, destination, waypoints);
-
-    if (routePoints.isNotEmpty) {
-      setState(() {
-        _polylines.add(Polyline(
-          polylineId: const PolylineId('new_route'),
+    setState(() {
+      _polylines = {
+        Polyline(
+          polylineId: const PolylineId('bus_route'),
           points: routePoints,
           color: Colors.blue,
           width: 5,
-        ));
-        _initialPosition = routePoints[routePoints.length ~/ 2];
-      });
+          geodesic: true,
+        ),
+      };
 
+      // Centrar el mapa en la ruta
+      _initialPosition = routePoints[routePoints.length ~/ 2];
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       _mapController?.animateCamera(
-        CameraUpdate.newLatLngBounds(_boundsFromLatLngList(routePoints), 100),
+        CameraUpdate.newLatLngBounds(_boundsFromLatLngList(routePoints), 100)
       );
-    }
-
-    setState(() => _loadingRoute = false);
+    });
   }
 
   Future<List<LatLng>> _getRoutePoints(
-      LatLng origin, LatLng destination, List<LatLng> waypoints) async {
-    // Construir cadena de waypoints para la URL
-    String waypointsParam = '';
-    if (waypoints.isNotEmpty) {
-      waypointsParam =
-          '&waypoints=optimize:true|${waypoints.map((point) => '${point.latitude},${point.longitude}').join('|')}';
-    }
+    LatLng origin, LatLng destination, List<LatLng> waypoints) async {
+    
+    String waypointsParam = waypoints.isNotEmpty
+      ? '&waypoints=optimize:true|${waypoints.map((p) => '${p.latitude},${p.longitude}').join('|')}'
+      : '';
 
     final url = Uri.parse(
       '$_directionsBaseUrl?'
@@ -147,23 +180,14 @@ class _MapaScreenState extends State<MapaScreen> {
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['status'] == 'OK') {
-          // Decodificar puntos de la ruta
-          final points = data['routes'][0]['overview_polyline']['points'];
-          return _decodePolyline(points);
+          return _decodePolyline(data['routes'][0]['overview_polyline']['points']);
         }
       }
-      return [
-        origin,
-        ...waypoints,
-        destination
-      ]; // Fallback a línea recta con waypoints
+      throw Exception('No se pudo obtener la ruta: ${response.statusCode}');
     } catch (e) {
-      print('Error obteniendo ruta: $e');
-      return [
-        origin,
-        ...waypoints,
-        destination
-      ]; // Fallback a línea recta con waypoints
+      debugPrint('Error al obtener ruta: $e');
+      // Fallback: línea recta con waypoints
+      return [origin, ...waypoints, destination];
     }
   }
 
@@ -200,50 +224,63 @@ class _MapaScreenState extends State<MapaScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.selectedBus?['nombre'] ?? 'Mapa de Autobús',
-            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-      ),
-      body: Stack(
-        children: [
-          GoogleMap(
-            initialCameraPosition: CameraPosition(
-              target: _initialPosition,
-              zoom: 12,
+      body: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Stack(
+          children: [
+            GoogleMap(
+              initialCameraPosition: CameraPosition(
+                target: _initialPosition,
+                zoom: 12,
+              ),
+              polylines: _polylines,
+              myLocationEnabled: _showUserLocation,
+              myLocationButtonEnabled: false, // Usamos nuestro propio botón
+              onMapCreated: (controller) {
+                _mapController = controller;
+              },
+              zoomControlsEnabled: false,
             ),
-            polylines: _polylines,
-            myLocationEnabled: true,
-            myLocationButtonEnabled: true,
-            onMapCreated: (controller) {
-              _mapController = controller;
-            },
-          ),
-          if (_loadingRoute)
-            const Center(
-              child: CircularProgressIndicator(),
+            if (_loadingRoute)
+              const Center(child: CircularProgressIndicator()),
+            
+            // Botón para mostrar/ocultar ubicación del usuario
+            Positioned(
+              right: 16,
+              bottom: 120,
+              child: FloatingActionButton(
+                heroTag: 'location_button',
+                mini: true,
+                onPressed: _toggleUserLocation,
+                child: Icon(
+                  _showUserLocation ? Icons.location_on : Icons.location_off,
+                  color: _showUserLocation ? const Color.fromARGB(255, 33, 243, 114) : const Color.fromARGB(255, 203, 201, 201),
+                ),
+              ),
             ),
-        ],
-      ),
-      floatingActionButton: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          const SizedBox(height: 10),
-          FloatingActionButton(
-            heroTag: 'route_button',
-            onPressed: () {
-              if (_polylines.isNotEmpty) {
-                _mapController?.animateCamera(
-                  CameraUpdate.newLatLngBounds(
-                    _boundsFromLatLngList(_polylines.first.points),
-                    100.0,
-                  ),
-                );
-              }
-            },
-            mini: true,
-            child: const Icon(Icons.alt_route),
-          ),
-        ],
+            
+            // Botón para centrar en la ruta
+            Positioned(
+              right: 16,
+              bottom: 180,
+              child: FloatingActionButton(
+                heroTag: 'route_button',
+                mini: true,
+                onPressed: () {
+                  if (_polylines.isNotEmpty) {
+                    _mapController?.animateCamera(
+                      CameraUpdate.newLatLngBounds(
+                        _boundsFromLatLngList(_polylines.first.points),
+                        100,
+                      ),
+                    );
+                  }
+                },
+                child: const Icon(Icons.alt_route, color: Color.fromARGB(255, 205, 210, 214)),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -265,5 +302,11 @@ class _MapaScreenState extends State<MapaScreen> {
       northeast: LatLng(x1!, y1!),
       southwest: LatLng(x0!, y0!),
     );
+  }
+
+  @override
+  void dispose() {
+    _mapController?.dispose();
+    super.dispose();
   }
 }

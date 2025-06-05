@@ -380,7 +380,7 @@ class _RouteEditorScreenState extends State<RouteEditorScreen> {
   }
 
   Widget _buildGoogleMap() {
-    return SizedBox(
+    return SizedBox(   
       height: 450,
       child: GoogleMap(
         initialCameraPosition: CameraPosition(

@@ -19,46 +19,72 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
   Map<int, bool> seatAvailability = {};
   bool isLoading = false;
   bool isPurchasing = false;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  // Datos adicionales
+  Map<String, dynamic>? _rutaData;
+  Map<String, dynamic>? _horarioData;
 
   @override
   void initState() {
     super.initState();
-    _loadSeatData();
+    _loadBusData();
   }
 
-  Future<void> _loadSeatData() async {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) setState(() => isLoading = true);
-    });
+  Future<void> _loadBusData() async {
+    if (!mounted) return;
+    setState(() => isLoading = true);
 
     try {
-      final doc = await FirebaseFirestore.instance
-          .collection('busRoutes')
-          .doc(widget.busData['id'])
-          .get();
+      // 1. Obtener datos completos del bus seleccionado
+      final busDoc =
+          await _firestore.collection('Bus').doc(widget.busData['id']).get();
+      if (!busDoc.exists) {
+        throw Exception('El bus no existe');
+      }
+      final busData = busDoc.data()!;
 
-      if (doc.exists) {
-        final data = doc.data() as Map<String, dynamic>;
-        final seatsData = data['seats'] as Map<String, dynamic>? ?? {};
+      // 2. Obtener datos de la ruta asociada
+      if (busData['rutasid'] != null) {
+        final rutaDoc =
+            await _firestore.collection('Rutas').doc(busData['rutasid']).get();
+        if (rutaDoc.exists) {
+          _rutaData = rutaDoc.data()!;
+          _rutaData!['id'] = rutaDoc.id;
+        }
+      }
 
-        setState(() {
-          // Convertir los datos de Firestore a nuestro mapa
-          seatAvailability = {
-            for (var entry in seatsData.entries)
-              int.parse(entry.key): entry.value as bool
-          };
+      // 3. Obtener datos del horario asociado
+      if (busData['horarios'] is List &&
+          (busData['horarios'] as List).isNotEmpty) {
+        final horarioId = (busData['horarios'] as List).first;
+        final horarioDoc =
+            await _firestore.collection('Horarios').doc(horarioId).get();
+        if (horarioDoc.exists) {
+          _horarioData = horarioDoc.data()!;
+          _horarioData!['id'] = horarioDoc.id;
+        }
+      }
 
-          // Asegurarnos de tener todos los asientos (1-24)
-          for (int i = 1; i <= 24; i++) {
-            seatAvailability.putIfAbsent(
-                i, () => false); // Por defecto disponibles
-          }
-        });
+      // 4. Obtener disponibilidad de asientos
+      final seatsData = busData['asientos'] as Map<String, dynamic>? ?? {};
+      seatAvailability = {
+        for (var entry in seatsData.entries)
+          int.parse(entry.key): entry.value as bool
+      };
+
+      // Asegurar todos los asientos (1-24)
+      for (int i = 1; i <= 24; i++) {
+        seatAvailability.putIfAbsent(i, () => false);
+      }
+
+      if (mounted) {
+        setState(() {});
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al cargar asientos: $e')),
+          SnackBar(content: Text('Error al cargar datos: $e')),
         );
       }
     } finally {
@@ -69,7 +95,7 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
   }
 
   Future<void> _refreshData() async {
-    await _loadSeatData();
+    await _loadBusData();
   }
 
   Future<void> _confirmPurchase() async {
@@ -78,26 +104,23 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
     setState(() => isPurchasing = true);
 
     try {
-      // Crear los boletos
+      // Crear boletos con los datos actualizados
       final boletos = selectedSeats
           .map((asiento) => Boleto(
                 asiento: asiento,
-                ruta: widget.busData['nombre'],
+                ruta: _rutaData?['nombre'] ?? 'Ruta no disponible',
                 fecha: DateTime.now(),
-                hora: widget.busData['horaSalida'],
-                precio: double.parse(widget.busData['precio'].toString()),
+                hora: _horarioData?['horaSalida'] ?? 'Hora no disponible',
+                precio: double.parse(_rutaData?['precio']?.toString() ?? '0.0'),
               ))
           .toList();
 
-      // Actualizar los asientos en Firestore
-      final batch = FirebaseFirestore.instance.batch();
-      final busRef = FirebaseFirestore.instance
-          .collection('busRoutes')
-          .doc(widget.busData['id']);
+      // Actualizar asientos en Firestore
+      final batch = _firestore.batch();
+      final busRef = _firestore.collection('Bus').doc(widget.busData['id']);
 
-      // Marcar asientos como ocupados
       for (var seat in selectedSeats) {
-        batch.update(busRef, {'seats.$seat': true});
+        batch.update(busRef, {'asientos.$seat': true});
       }
 
       await batch.commit();
@@ -314,191 +337,204 @@ class _SeatSelectionScreenState extends State<SeatSelectionScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final totalPrice = selectedSeats.isNotEmpty
-        ? (double.tryParse(widget.busData['precio'].toString()) ?? 0.0) *
-            selectedSeats.length
-        : 0.0;
+    final precio =
+        double.tryParse(_rutaData?['precio']?.toString() ?? '0.0') ?? 0.0;
+    final totalPrice =
+        selectedSeats.isNotEmpty ? precio * selectedSeats.length : 0.0;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Asientos - ${widget.busData['nombre']}'),
+        title: Text('Asientos - ${_rutaData?['nombre'] ?? 'Ruta'}'),
         centerTitle: true,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Información del viaje
-            Card(
-              elevation: 3,
-              child: Padding(
-                padding: const EdgeInsets.all(12.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      widget.busData['nombre'],
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Información del viaje
+                  Card(
+                    elevation: 3,
+                    child: Padding(
+                      padding: const EdgeInsets.all(12.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _rutaData?['nombre'] ?? 'Ruta no disponible',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                  'Salida: ${_horarioData?['horaSalida'] ?? 'Hora no disponible'}'),
+                              Text(
+                                  'Llegada: ${_horarioData?['horaLlegada'] ?? 'Hora no disponible'}'),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Precio unitario: \$${precio.toStringAsFixed(2)}',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              color: Colors.grey,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('Salida: ${widget.busData['horaSalida']}'),
-                        Text('Llegada: ${widget.busData['horaLlegada']}'),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Precio unitario: \$${(double.tryParse(widget.busData['precio'].toString())?.toStringAsFixed(2) ?? '0.00')}',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        color: Colors.grey,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
+                  ),
+                  const SizedBox(height: 20),
 
-            // Leyenda de asientos
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                const SeatLegend(color: Colors.white, text: 'Disponible'),
-                SeatLegend(color: Colors.grey.shade600, text: 'Ocupado'),
-                const SeatLegend(color: Colors.blue, text: 'Seleccionado'),
-              ],
-            ),
-            const SizedBox(height: 20),
-
-            // Resumen de selección
-            if (selectedSeats.isNotEmpty) ...[
-              Card(
-                color: Theme.of(context).colorScheme.onPrimary,
-                child: Padding(
-                  padding: const EdgeInsets.all(12.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  // Leyenda de asientos
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      if (selectedSeats.length > 1) ...[
-                        Text(
-                          'Cantidad de asientos: ${selectedSeats.length}',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        Text(
-                          'Asientos seleccionados: ${selectedSeats.join(', ')}',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ] else ...[
-                        Text(
-                          'Asiento seleccionado: ${selectedSeats.join(', ')}',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ],
-                      const SizedBox(height: 4),
-                      Text(
-                        'Total: \$${totalPrice.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.green,
-                        ),
-                      ),
+                      const SeatLegend(color: Colors.white, text: 'Disponible'),
+                      SeatLegend(color: Colors.grey.shade600, text: 'Ocupado'),
+                      const SeatLegend(
+                          color: Colors.blue, text: 'Seleccionado'),
                     ],
                   ),
-                ),
-              ),
-              const SizedBox(height: 10),
-            ],
+                  const SizedBox(height: 20),
 
-            const Text(
-              'Selecciona tus asientos:',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 10),
-
-            // StreamBuilder para la lista de asientos
-            Expanded(
-              child: StreamBuilder<DocumentSnapshot>(
-                stream: FirebaseFirestore.instance
-                    .collection('busRoutes')
-                    .doc(widget.busData['id'])
-                    .snapshots(),
-                builder: (context, snapshot) {
-                  if (snapshot.hasError) {
-                    return Center(child: Text('Error: ${snapshot.error}'));
-                  }
-
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-
-                  if (!snapshot.hasData || snapshot.data!.data() == null) {
-                    return const Center(child: Text('No se encontraron datos'));
-                  }
-
-                  // Procesar datos y actualizar estado
-                  final data = snapshot.data!.data() as Map<String, dynamic>;
-                  final seatsData =
-                      data['seats'] as Map<String, dynamic>? ?? {};
-
-                  // Actualizar el mapa de disponibilidad
-                  seatAvailability = {
-                    for (var entry in seatsData.entries)
-                      int.parse(entry.key): entry.value as bool
-                  };
-
-                  // Asegurar que tenemos todos los asientos (1-24)
-                  for (int i = 1; i <= 24; i++) {
-                    seatAvailability.putIfAbsent(i, () => false);
-                  }
-
-                  return _buildBusLayout();
-                },
-              ),
-            ),
-
-            const SizedBox(height: 10),
-            // Botón de confirmación
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: isPurchasing
-                      ? Colors.grey
-                      : selectedSeats.isNotEmpty
-                          ? Colors.green
-                          : Colors.red,
-                  foregroundColor:
-                      selectedSeats.isNotEmpty ? Colors.white : Colors.red,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  elevation: 3,
-                ),
-                onPressed: selectedSeats.isNotEmpty && !isPurchasing
-                    ? _confirmPurchase
-                    : null,
-                child: isPurchasing
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : Text(
-                        selectedSeats.isEmpty
-                            ? 'Selecciona al menos un asiento'
-                            : 'Confirmar ${selectedSeats.length} asiento(s)',
-                        style: const TextStyle(fontSize: 18),
+                  // Resumen de selección
+                  if (selectedSeats.isNotEmpty) ...[
+                    Card(
+                      color: Theme.of(context).colorScheme.onPrimary,
+                      child: Padding(
+                        padding: const EdgeInsets.all(12.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (selectedSeats.length > 1) ...[
+                              Text(
+                                'Cantidad de asientos: ${selectedSeats.length}',
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold),
+                              ),
+                              Text(
+                                'Asientos seleccionados: ${selectedSeats.join(', ')}',
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold),
+                              ),
+                            ] else ...[
+                              Text(
+                                'Asiento seleccionado: ${selectedSeats.first}',
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                            const SizedBox(height: 4),
+                            Text(
+                              'Total: \$${totalPrice.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
+                    ),
+                    const SizedBox(height: 10),
+                  ],
+
+                  const Text(
+                    'Selecciona tus asientos:',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 10),
+
+                  // StreamBuilder para actualización en tiempo real
+                  Expanded(
+                    child: StreamBuilder<DocumentSnapshot>(
+                      stream: _firestore
+                          .collection('Bus')
+                          .doc(widget.busData['id'])
+                          .snapshots(),
+                      builder: (context, snapshot) {
+                        if (snapshot.hasError) {
+                          return Center(
+                              child: Text('Error: ${snapshot.error}'));
+                        }
+
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                              child: CircularProgressIndicator());
+                        }
+
+                        if (!snapshot.hasData || !snapshot.data!.exists) {
+                          return const Center(
+                              child: Text('No se encontraron datos'));
+                        }
+
+                        // Actualizar disponibilidad de asientos
+                        final data =
+                            snapshot.data!.data() as Map<String, dynamic>;
+                        final seatsData =
+                            data['asientos'] as Map<String, dynamic>? ?? {};
+
+                        seatAvailability = {
+                          for (var entry in seatsData.entries)
+                            int.parse(entry.key): entry.value as bool
+                        };
+
+                        // Asegurar todos los asientos (1-24)
+                        for (int i = 1; i <= 24; i++) {
+                          seatAvailability.putIfAbsent(i, () => false);
+                        }
+
+                        return _buildBusLayout();
+                      },
+                    ),
+                  ),
+
+                  const SizedBox(height: 10),
+                  // Botón de confirmación
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: isPurchasing
+                            ? Colors.grey
+                            : selectedSeats.isNotEmpty
+                                ? Colors.green
+                                : Colors.red,
+                        foregroundColor: selectedSeats.isNotEmpty
+                            ? Colors.white
+                            : Colors.red,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        elevation: 3,
+                      ),
+                      onPressed: selectedSeats.isNotEmpty && !isPurchasing
+                          ? _confirmPurchase
+                          : null,
+                      child: isPurchasing
+                          ? const CircularProgressIndicator(color: Colors.white)
+                          : Text(
+                              selectedSeats.isEmpty
+                                  ? 'Selecciona al menos un asiento'
+                                  : 'Confirmar ${selectedSeats.length} asiento(s)',
+                              style: const TextStyle(fontSize: 18),
+                            ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
-      ),
     );
   }
 }

@@ -1,5 +1,7 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:nau/admin/admin_panel_screen.dart';
+import 'package:nau/pages/RouteEditorScreen.dart';
 import 'package:nau/pages/document_page.dart';
 import 'package:nau/pages/login.dart';
 import 'package:nau/pages/perfilconfig.dart';
@@ -57,6 +59,9 @@ class MainApp extends StatelessWidget {
           final userId = AuthService().getCurrentUid();
           return DocumentPage(userId: userId);
         },
+        '/RouteEditorScreen': (context) => const RouteEditorScreen(),
+        '/admin_panel': (context) => const PanelAdministrador(),
+
       },
       theme: Provider.of<ThemeProvider>(context).themeData,
     );

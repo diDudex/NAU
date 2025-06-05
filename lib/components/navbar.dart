@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../pages/RouteEditorScreen.dart';
+import 'package:nau/screens_driver/DriverHomeScreen.dart';
+import 'package:nau/pages/lector_qr.dart';
 import '../pages/home.dart';
 import '../pages/settings_page.dart';
 import '../pages/walletscreen.dart';
@@ -20,7 +21,8 @@ class _MainNavigationState extends State<MainNavigation> {
     const HomeScreen(),
     const Walletscreen(),
     const SettingsPage(),
-    const RouteEditorScreen(),
+    const DriverHomeScreen(),
+    const QRScannerScreen(), 
   ];
 
   void _onItemTapped(int index) {
@@ -53,8 +55,12 @@ class _MainNavigationState extends State<MainNavigation> {
             label: 'Ajustes',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.route),
-            label: 'Editor de Ruta',
+            icon: Icon(Icons.directions_bus),
+            label: 'Conductor',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.qr_code_scanner),
+            label: 'Escanear',
           ),
         ],
       ),

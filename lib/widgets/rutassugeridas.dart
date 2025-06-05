@@ -1,187 +1,247 @@
+import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 
-class RutasSugeridas extends StatelessWidget {
+class RutasSugeridas extends StatefulWidget {
   final Function(Map<String, dynamic>)? onBusSelected;
 
   const RutasSugeridas({super.key, this.onBusSelected});
 
-  // Función para convertir horaSalida a TimeOfDay
-  TimeOfDay? _parseTimeString(String timeStr) {
+  @override
+  State<RutasSugeridas> createState() => _RutasSugeridasState();
+}
+
+class _RutasSugeridasState extends State<RutasSugeridas> {
+  final Random _random = Random();
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  List<Map<String, dynamic>> _rutasCompletas = [];
+  bool _isLoading = true;
+  String? _errorMessage;
+  bool _dateFormatInitialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeDateFormatting().then((_) {
+      _cargarRutasCompletas();
+    });
+  }
+
+  Future<void> _initializeDateFormatting() async {
+    setState(() {
+      _dateFormatInitialized = true;
+    });
+  }
+
+  Future<void> _cargarRutasCompletas() async {
+    if (!_dateFormatInitialized) return;
+
     try {
-      final parts = timeStr.split(' ');
-      if (parts.length != 2) return null;
-      
-      final timePart = parts[0].split(':');
-      if (timePart.length != 2) return null;
-      
-      int hour = int.parse(timePart[0]);
-      final minute = int.parse(timePart[1]);
-      final period = parts[1].toUpperCase();
-      
-      if (period == 'PM' && hour != 12) {
-        hour += 12;
-      } else if (period == 'AM' && hour == 12) {
-        hour = 0;
+      // 1. Obtener todas las rutas disponibles
+      final rutasSnapshot = await _firestore.collection('Rutas').get();
+
+      // 2. Para cada ruta, obtener sus horarios y buses asociados
+      List<Map<String, dynamic>> rutasCompletas = [];
+
+      for (var rutaDoc in rutasSnapshot.docs) {
+        final rutaData = rutaDoc.data();
+        rutaData['id'] = rutaDoc.id;
+
+        // Obtener horarios asociados (como en tu imagen de Horarios)
+        final horariosQuery = await _firestore
+            .collection('Horarios')
+            .where('rutaId', isEqualTo: rutaDoc.id)
+            .get();
+
+        final horarios = horariosQuery.docs.map((doc) {
+          final horarioData = doc.data();
+          horarioData['id'] = doc.id;
+          return horarioData;
+        }).toList();
+
+        rutaData['horarios'] = horarios;
+
+        // Obtener buses asociados (como en tu imagen de Bus)
+        final busesQuery = await _firestore
+            .collection('Bus')
+            .where('rutasid', isEqualTo: rutaDoc.id)
+            .get();
+
+        final buses = busesQuery.docs.map((doc) {
+          final busData = doc.data();
+          busData['id'] = doc.id;
+          return busData;
+        }).toList();
+
+        rutaData['buses'] = buses;
+
+        rutasCompletas.add(rutaData);
       }
-      
-      return TimeOfDay(hour: hour, minute: minute);
+
+      setState(() {
+        _rutasCompletas = rutasCompletas;
+        _isLoading = false;
+      });
     } catch (e) {
-      return null;
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = 'Error al cargar rutas: ${e.toString()}';
+        _isLoading = false;
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final tomorrow = today.add(const Duration(days: 1));
-    final currentTime = TimeOfDay.fromDateTime(now);
+    if (!_dateFormatInitialized || _isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('busRoutes')
-          .where('createdAt', isGreaterThanOrEqualTo: today)
-          .where('createdAt', isLessThan: tomorrow.add(const Duration(days: 1)))
-          .snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return const Center(child: Text('No hay rutas sugeridas.'));
-        }
+    if (_errorMessage != null) {
+      return Center(child: Text(_errorMessage!));
+    }
 
-        // Filtrar rutas
-        final routes = snapshot.data!.docs.where((doc) {
-          final route = doc.data() as Map<String, dynamic>;
-          final busDate = route['createdAt'] is Timestamp 
-              ? (route['createdAt'] as Timestamp).toDate()
-              : DateTime.tryParse(route['createdAt'].toString());
-          
-          if (busDate == null) return false;
-          
-          final horaSalidaStr = route['horaSalida'] as String? ?? '';
-          final horaSalida = _parseTimeString(horaSalidaStr);
-          
-          if (horaSalida == null) return false;
-          
-          // Si es para mañana, mostrar siempre
-          if (busDate.year == tomorrow.year && 
-              busDate.month == tomorrow.month && 
-              busDate.day == tomorrow.day) {
-            return true;
-          }
-          
-          // Si es para hoy, mostrar solo los que salen después de la hora actual
-          final salidaDateTime = DateTime(
-              busDate.year, busDate.month, busDate.day, 
-              horaSalida.hour, horaSalida.minute);
-          
-          return salidaDateTime.isAfter(now);
-        }).toList();
+    if (_rutasCompletas.isEmpty) {
+      return const Center(child: Text('No hay rutas disponibles'));
+    }
 
-        if (routes.isEmpty) {
-          return const Center(child: Text('No hay rutas disponibles.'));
-        }
+    // Seleccionar 3 rutas al azar
+    final rutasAleatorias = _obtenerRutasAleatorias(_rutasCompletas, 3);
 
-        // Ordenar por fecha y hora
-        routes.sort((a, b) {
-          final aData = a.data() as Map<String, dynamic>;
-          final bData = b.data() as Map<String, dynamic>;
-          
-          final aDate = aData['createdAt'] is Timestamp 
-              ? (aData['createdAt'] as Timestamp).toDate()
-              : DateTime.parse(aData['createdAt'].toString());
-          final bDate = bData['createdAt'] is Timestamp 
-              ? (bData['createdAt'] as Timestamp).toDate()
-              : DateTime.parse(bData['createdAt'].toString());
-              
-          final aTime = _parseTimeString(aData['horaSalida'] ?? '') ?? TimeOfDay(hour: 0, minute: 0);
-          final bTime = _parseTimeString(bData['horaSalida'] ?? '') ?? TimeOfDay(hour: 0, minute: 0);
-          
-          final aDateTime = DateTime(aDate.year, aDate.month, aDate.day, aTime.hour, aTime.minute);
-          final bDateTime = DateTime(bDate.year, bDate.month, bDate.day, bTime.hour, bTime.minute);
-          
-          return aDateTime.compareTo(bDateTime);
-        });
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: rutasAleatorias.length,
+      itemBuilder: (context, index) {
+        final ruta = rutasAleatorias[index];
+        final nombreRuta = ruta['nombre'] ?? 'Ruta sin nombre';
+        final horarios = ruta['horarios'] as List;
+        final buses = ruta['buses'] as List;
 
-        return ListView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: routes.length,
-          itemBuilder: (context, index) {
-            final route = routes[index].data() as Map<String, dynamic>;
-            final docId = routes[index].id;
-            final horaSalidaParsed = _parseTimeString(route['horaSalida'] ?? '');
-            final busDate = route['createdAt'] is Timestamp 
-                ? (route['createdAt'] as Timestamp).toDate()
-                : DateTime.parse(route['createdAt'].toString());
-            
-            final routeWithId = {...route, 'id': docId};
-            final isTomorrow = busDate.year == tomorrow.year && 
-                             busDate.month == tomorrow.month && 
-                             busDate.day == tomorrow.day;
-            
-            return Card(
-              margin: const EdgeInsets.symmetric(vertical: 6),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(4),
-                onTap: () {
-                  if (onBusSelected != null) {
-                    onBusSelected!(routeWithId);
-                  }
-                },
-                child: ListTile(
-                  leading: const Icon(Icons.directions_bus),
-                  title: Text(
-                    (() {
-                      final nombre = route['nombre'] ?? '';
-                      final partes = nombre.split('-');
-                      final origen = partes.isNotEmpty ? partes.first : '';
-                      final destino = partes.length > 1 ? partes.last : '';
-                      return '$origen ➡ $destino';
-                    })(),
-                  ),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Hora de salida: ${route['horaSalida']}'),
-                      Text('Fecha: ${DateFormat('dd/MM/yyyy').format(busDate)}'),
-                      if (isTomorrow)
-                        const Text('(Mañana)', style: TextStyle(color: Color.fromARGB(255, 63, 142, 67))),
-                      if (horaSalidaParsed != null && !isTomorrow)
-                        Text(
-                          'Sale en ${_formatTimeUntilDeparture(horaSalidaParsed, currentTime)}',
-                          style: TextStyle(color: Color.fromARGB(255, 80, 197, 86)),
+        // Tomamos el primer horario disponible para mostrar
+        final horarioPrincipal = horarios.isNotEmpty ? horarios[0] : {};
+        final fechaHorario = horarioPrincipal['fecha'] != null
+            ? _parsearFecha(horarioPrincipal['fecha'])
+            : null;
+
+        return Card(
+          margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+          elevation: 2,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: () => widget.onBusSelected?.call(ruta),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Nombre de la ruta (formateado)
+                  Text(
+                    _formatearNombreRuta(nombreRuta),
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
                         ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Detalles de origen y destino
+                  Row(
+                    children: [
+                      const Icon(Icons.place, size: 16, color: Colors.red),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Origen: ${horarioPrincipal['origen'] ?? 'No especificado'}',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ),
                     ],
                   ),
-                  trailing: onBusSelected != null 
-                      ? const Icon(Icons.chevron_right, color: Colors.grey)
-                      : null,
-                ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Icon(Icons.flag, size: 16, color: Colors.green),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Destino: ${horarioPrincipal['destino'] ?? 'No especificado'}',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Fecha y hora
+                  if (fechaHorario != null)
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Fecha: ${horarioPrincipal['fecha'] is Timestamp ? (horarioPrincipal['fecha'] as Timestamp).toDate().toString().split(' ')[0] : (horarioPrincipal['fecha']?.toString().split(' ')[0] ?? '--/--/----')}',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                        Text(
+                          'Hora: ${horarioPrincipal['horaInicio'] ?? '--:--'}',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ],
+                    ),
+
+                  const SizedBox(height: 12),
+
+                  // Información de buses disponibles
+                  Row(
+                    children: [
+                      const Icon(Icons.directions_bus, size: 16),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Buses disponibles: ${buses.length}',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color:
+                                  buses.isNotEmpty ? Colors.green : Colors.grey,
+                            ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-            );
-          },
+            ),
+          ),
         );
       },
     );
   }
 
-  String _formatTimeUntilDeparture(TimeOfDay departure, TimeOfDay now) {
-    final totalDepartureMinutes = departure.hour * 60 + departure.minute;
-    final totalNowMinutes = now.hour * 60 + now.minute;
-    final difference = totalDepartureMinutes - totalNowMinutes;
+  DateTime _parsearFecha(dynamic fecha) {
+    try {
+      if (fecha is Timestamp) {
+        return fecha.toDate();
+      } else if (fecha is String) {
+        return DateTime.parse(fecha);
+      }
+      return DateTime.now();
+    } catch (e) {
+      return DateTime.now();
+    }
+  }
 
-    if (difference <= 0) return 'Ahora';
-    if (difference < 60) return 'en $difference min';
-    
-    final hours = difference ~/ 60;
-    final minutes = difference % 60;
-    
-    if (minutes == 0) return 'en $hours h';
-    return 'en $hours h $minutes min';
+  List<Map<String, dynamic>> _obtenerRutasAleatorias(
+      List<Map<String, dynamic>> todasLasRutas, int cantidad) {
+    if (todasLasRutas.length <= cantidad) return todasLasRutas;
+    final shuffled = List.of(todasLasRutas)..shuffle(_random);
+    return shuffled.take(cantidad).toList();
+  }
+
+  String _formatearNombreRuta(String nombre) {
+    final partes = nombre.split('-');
+    final origen = partes.isNotEmpty
+        ? partes.first[0].toUpperCase() +
+            partes.first.substring(1).toLowerCase()
+        : 'Origen';
+    final destino = partes.length > 1
+        ? partes.last[0].toUpperCase() + partes.last.substring(1).toLowerCase()
+        : 'Destino';
+    return '$origen → $destino';
   }
 }

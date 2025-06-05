@@ -16,17 +16,12 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   String _searchText = '';
-  String? _selectedFilter;
-  String? _selectedSort;
   Map<String, dynamic>? _selectedBus;
 
   List<Map<String, dynamic>> _buses = [];
-  List<Map<String, dynamic>> _filteredBuses = [];
-  bool _isLoading = true;
 
+  // ignore: unused_field
   Position? _currentPosition;
-
-  bool _filtersApplied = false;
 
   @override
   void initState() {
@@ -42,7 +37,6 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final position = await Geolocator.getCurrentPosition();
       setState(() => _currentPosition = position);
-      _applyFilters();
     } catch (e) {
       debugPrint("Error obteniendo ubicación: $e");
     }
@@ -50,8 +44,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _fetchBuses() async {
     try {
-      final snapshot =
-          await FirebaseFirestore.instance.collection('busRoutes').get();
+      final snapshot = await FirebaseFirestore.instance.collection('Bus').get();
 
       setState(() {
         _buses = snapshot.docs.map((doc) {
@@ -59,17 +52,16 @@ class _HomeScreenState extends State<HomeScreen> {
           data['id'] = doc.id;
           return data;
         }).toList();
-        _isLoading = false;
       });
     } catch (e) {
       debugPrint("Error al obtener buses: $e");
-      setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error al cargar rutas: $e')),
       );
     }
   }
 
+  // ignore: unused_element
   double _calculateDistance(Position position, double lat, double lng) {
     return Geolocator.distanceBetween(
       position.latitude,
@@ -79,88 +71,18 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _applyFilters() {
-    setState(() {
-      _filtersApplied = true; // Marcamos que los filtros han sido aplicados
-    });
-
-    List<Map<String, dynamic>> filtered = [..._buses];
-
-    // Solo aplicar filtros si el usuario ha interactuado
-    if (_filtersApplied) {
-      // Aplicar filtro de búsqueda
-      if (_searchText.isNotEmpty) {
-        filtered = filtered.where((bus) {
-          final nombre = (bus['nombre'] ?? '').toString().toLowerCase();
-          final search = _searchText.toLowerCase();
-          return nombre.contains(search);
-        }).toList();
-      }
-
-      // Aplicar filtro de ruta
-      if (_selectedFilter != 'Todos') {
-        filtered = filtered.where((bus) {
-          return bus['nombre'] == _selectedFilter;
-        }).toList();
-      }
-
-      // Aplicar ordenamiento
-      switch (_selectedSort) {
-        case 'Cercanía':
-          if (_currentPosition != null) {
-            filtered.sort((a, b) {
-              final aOrigin = a['origin'] ?? {};
-              final bOrigin = b['origin'] ?? {};
-              final aDistance = _calculateDistance(
-                _currentPosition!,
-                aOrigin['lat'] ?? 0.0,
-                aOrigin['log'] ??
-                    0.0, // Nota: tu BD usa 'log' en lugar de 'lng'
-              );
-              final bDistance = _calculateDistance(
-                _currentPosition!,
-                bOrigin['lat'] ?? 0.0,
-                bOrigin['log'] ?? 0.0,
-              );
-              return aDistance.compareTo(bDistance);
-            });
-          }
-          break;
-
-        case 'Tiempo':
-          filtered.sort((a, b) {
-            final aTime = _parseTime(a['horaSalida'] ?? '12:00 AM');
-            final bTime = _parseTime(b['horaSalida'] ?? '12:00 AM');
-            return aTime.hour.compareTo(bTime.hour);
-          });
-          break;
-        case 'Nombre':
-          filtered.sort((a, b) => (a['nombre'] ?? '')
-              .toString()
-              .compareTo((b['nombre'] ?? '').toString()));
-          break;
-        case 'Precio':
-          filtered
-              .sort((a, b) => (a['precio'] ?? 0).compareTo(b['precio'] ?? 0));
-          break;
-      }
-
-      setState(() => _filteredBuses = filtered);
-    }
-  }
-
   Widget _buildSelectedBusCard() {
     if (_selectedBus == null) return const SizedBox.shrink();
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       child: Card(
         elevation: 4,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(10),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -185,7 +107,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 5),
               Row(
                 children: [
                   Image.asset(
@@ -360,10 +282,13 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              // Barra de búsqueda
+        child: ListView(
+          padding: EdgeInsets.zero,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          children: [
+            // Barra de búsqueda
+            Column(children: [
               Padding(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -379,74 +304,117 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   onChanged: (value) {
                     setState(() {
-                      _searchText = value;
-                      _applyFilters();
+                      _searchText = value
+                          .trim(); // Usamos trim() para eliminar espacios en blanco
                     });
                   },
                 ),
               ),
-              // Lista pequeña de resultados de búsqueda
-              if (_searchText.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: _buses
-                        .where((bus) {
-                          // Filtro por nombre
-                          final nombre =
-                              (bus['nombre'] ?? '').toString().toLowerCase();
-                          final search = _searchText.toLowerCase();
-                          return nombre.split('-').any(
-                                  (part) => part.trim().startsWith(search)) ||
-                              nombre.contains(search);
-                        })
-                        .where((bus) {
-                          final horaLlegadaStr = bus['horaLlegada'];
-                          if (horaLlegadaStr == null) return false;
-
-                          final busDate = bus['createdAt'] != null
-                              ? (bus['createdAt'] is Timestamp
-                                  ? (bus['createdAt'] as Timestamp).toDate()
-                                  : DateTime.tryParse(
-                                      bus['createdAt'].toString()))
-                              : null;
-
-                          if (busDate == null) return false;
-
-                          final now = DateTime.now();
-                          final today = DateTime(now.year, now.month, now.day);
-                          final tomorrow = today.add(const Duration(days: 1));
-
-                          // Mostrar todos los autobuses de mañana
-                          if (busDate.year == tomorrow.year &&
-                              busDate.month == tomorrow.month &&
-                              busDate.day == tomorrow.day) {
-                            return true;
+            ]),
+            // Lista pequeña de resultados de búsqueda
+            if (_searchText.isNotEmpty)
+              Builder(
+                builder: (context) {
+                  final filteredBuses = _buses
+                      .where((bus) {
+                        final rutasId =
+                            (bus['rutasid'] ?? '').toString().toLowerCase();
+                        final search = _searchText.toLowerCase();
+                        return rutasId.split('-').any(
+                                (part) => part.trim().startsWith(search)) ||
+                            rutasId.contains(search);
+                      })
+                      .where((bus) {
+                        // Obtener la hora de llegada desde horarios['horaLlegada']
+                        dynamic horariosRaw = bus['horarios'];
+                        String? horaLlegadaStr;
+                        if (horariosRaw is Map<String, dynamic>) {
+                          horaLlegadaStr = horariosRaw['horaLlegada'];
+                        } else if (horariosRaw is List &&
+                            horariosRaw.isNotEmpty) {
+                          // Si es una lista, intenta tomar el primer elemento si es un mapa
+                          final first = horariosRaw.first;
+                          if (first is Map<String, dynamic>) {
+                            horaLlegadaStr = first['horaLlegada'];
                           }
+                        }
+                        if (horaLlegadaStr == null) return false;
 
-                          // Para autobuses de hoy, mostrar solo los que aún no han llegado
-                          if (busDate.year == now.year &&
-                              busDate.month == now.month &&
-                              busDate.day == now.day) {
-                            final llegada = _parseTime(horaLlegadaStr);
-                            final llegadaDateTime = DateTime(
-                                busDate.year,
-                                busDate.month,
-                                busDate.day,
-                                llegada.hour,
-                                llegada.minute);
-                            return llegadaDateTime.isAfter(now);
+                        // Usar 'fecha' en vez de 'createdAt'
+                        final fecha = bus['fecha'] != null
+                            ? (bus['fecha'] is Timestamp
+                                ? (bus['fecha'] as Timestamp).toDate()
+                                : DateTime.tryParse(bus['fecha'].toString()))
+                            : null;
+
+                        if (fecha == null) return false;
+
+                        final now = DateTime.now();
+                        final today = DateTime(now.year, now.month, now.day);
+                        final tomorrow = today.add(const Duration(days: 1));
+
+                        if (fecha.year == tomorrow.year &&
+                            fecha.month == tomorrow.month &&
+                            fecha.day == tomorrow.day) {
+                          return true;
+                        }
+
+                        if (fecha.year == now.year &&
+                            fecha.month == now.month &&
+                            fecha.day == now.day) {
+                          final llegada = _parseTime(horaLlegadaStr);
+                          final llegadaDateTime = DateTime(
+                              fecha.year,
+                              fecha.month,
+                              fecha.day,
+                              llegada.hour,
+                              llegada.minute);
+                          return llegadaDateTime.isAfter(now);
+                        }
+
+                        return false;
+                      })
+                      .take(3)
+                      .toList();
+
+                  if (filteredBuses.isEmpty) {
+                    return Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child:
+                          Text('No se encontraron rutas para "$_searchText"'),
+                    );
+                  }
+
+                  return SizedBox(
+                    height: 170,
+                    child: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: filteredBuses.map((bus) {
+                          // Obtener la fecha desde horarios['fecha'] si existe, si no, usar bus['fecha']
+                          DateTime? busDate;
+                          dynamic horariosRaw = bus['horarios'];
+                          if (horariosRaw is Map<String, dynamic> &&
+                              horariosRaw['fecha'] != null) {
+                            if (horariosRaw['fecha'] is Timestamp) {
+                              busDate =
+                                  (horariosRaw['fecha'] as Timestamp).toDate();
+                            } else if (horariosRaw['fecha'] is String) {
+                              busDate = DateTime.tryParse(horariosRaw['fecha']);
+                            }
+                          } else if (horariosRaw is List &&
+                              horariosRaw.isNotEmpty) {
+                            final first = horariosRaw.first;
+                            if (first is Map<String, dynamic> &&
+                                first['fecha'] != null) {
+                              if (first['fecha'] is Timestamp) {
+                                busDate =
+                                    (first['fecha'] as Timestamp).toDate();
+                              } else if (first['fecha'] is String) {
+                                busDate = DateTime.tryParse(first['fecha']);
+                              }
+                            }
                           }
-
-                          return false;
-                        })
-                        .take(3)
-                        .map((bus) {
-                          final busDate =
-                              (bus['createdAt'] as Timestamp).toDate();
-                          final fechaStr =
-                              DateFormat('dd/MM/yyyy').format(busDate);
 
                           return ListTile(
                             contentPadding: EdgeInsets.zero,
@@ -455,7 +423,27 @@ class _HomeScreenState extends State<HomeScreen> {
                               height: 32,
                               width: 32,
                             ),
-                            title: Text(bus['nombre'] ?? ''),
+                            title: FutureBuilder<DocumentSnapshot>(
+                              future: FirebaseFirestore.instance
+                                  .collection('Rutas')
+                                  .doc(bus['rutasid'])
+                                  .get(),
+                              builder: (context, snapshot) {
+                                if (snapshot.connectionState ==
+                                    ConnectionState.waiting) {
+                                  return const Text('Cargando ruta...');
+                                }
+                                if (!snapshot.hasData ||
+                                    !snapshot.data!.exists) {
+                                  return Text(bus['nombre'] ?? '');
+                                }
+                                final rutaData = snapshot.data!.data()
+                                    as Map<String, dynamic>?;
+                                final rutaNombre =
+                                    rutaData?['nombre'] ?? bus['nombre'] ?? '';
+                                return Text(rutaNombre);
+                              },
+                            ),
                             subtitle: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -466,20 +454,24 @@ class _HomeScreenState extends State<HomeScreen> {
                                         bus['horaSalida'] ?? '12:00 AM');
                                     final llegada = _parseTime(
                                         bus['horaLlegada'] ?? '12:00 AM');
-                                    final salidaDateTime = DateTime(
-                                      busDate.year,
-                                      busDate.month,
-                                      busDate.day,
-                                      salida.hour,
-                                      salida.minute,
-                                    );
-                                    final llegadaDateTime = DateTime(
-                                      busDate.year,
-                                      busDate.month,
-                                      busDate.day,
-                                      llegada.hour,
-                                      llegada.minute,
-                                    );
+                                    final salidaDateTime = busDate != null
+                                        ? DateTime(
+                                            busDate.year,
+                                            busDate.month,
+                                            busDate.day,
+                                            salida.hour,
+                                            salida.minute,
+                                          )
+                                        : DateTime.now();
+                                    final llegadaDateTime = busDate != null
+                                        ? DateTime(
+                                            busDate.year,
+                                            busDate.month,
+                                            busDate.day,
+                                            llegada.hour,
+                                            llegada.minute,
+                                          )
+                                        : DateTime.now();
 
                                     String formatDuration(int totalMinutes) {
                                       final hours = totalMinutes ~/ 60;
@@ -535,8 +527,10 @@ class _HomeScreenState extends State<HomeScreen> {
                                     }
                                   },
                                 ),
-                                Text('Fecha: $fechaStr'),
-                                if (busDate.day == DateTime.now().day + 1)
+                                Text(
+                                    'Fecha: ${busDate != null ? DateFormat('dd/MM/yyyy').format(busDate) : 'N/A'}'),
+                                if (busDate != null &&
+                                    busDate.day == DateTime.now().day + 1)
                                   const Text('(Mañana)',
                                       style: TextStyle(color: Colors.green)),
                               ],
@@ -548,213 +542,52 @@ class _HomeScreenState extends State<HomeScreen> {
                               });
                             },
                           );
-                        })
-                        .toList(),
+                        }).toList(),
+                      ),
+                    ),
+                  );
+                },
+              ),
+
+            // Mapa de rutas
+            const SizedBox(
+              height: 380,
+              child: MapaScreen(),
+            ),
+
+            // Parte inferior (rutas sugeridas)
+            SizedBox(
+              height: 400,
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Mostrar autobús seleccionado
+                      _buildSelectedBusCard(),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Rutas sugeridas',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      RutasSugeridas(
+                        onBusSelected: (bus) {
+                          setState(() {
+                            _selectedBus = bus;
+                          });
+                        },
+                      ),
+                    ],
                   ),
                 ),
-              // Filtros y orden
-              Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: Row(
-                  children: [
-                    // Filtro por ruta
-                    Expanded(
-                        child: DropdownButtonFormField<String>(
-                        value: _selectedFilter,
-                        hint: const Text('Buses'),
-                        decoration: InputDecoration(
-                          contentPadding:
-                            const EdgeInsets.symmetric(horizontal: 12),
-                          border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide.none,
-                          ),
-                          filled: true,
-                          fillColor: Theme.of(context).colorScheme.surface,
-                        ),
-                        items: [
-                          const DropdownMenuItem(
-                          value: 'Todos',
-                          child: Text('Todos los buses'),
-                          ),
-                          const DropdownMenuItem(
-                          value: 'Ninguno',
-                          child: Text('No mostrar buses'),
-                          ),
-                          ..._buses
-                            .map((bus) => bus['nombre'] as String)
-                            .toSet()
-                            .map((nombre) => DropdownMenuItem(
-                              value: nombre,
-                              child: Text(nombre),
-                              ))
-                            .toList(),
-                        ],
-                        onChanged: (value) {
-                          setState(() {
-                          _selectedFilter = value!;
-                          if (_selectedFilter == 'Ninguno') {
-                            _filteredBuses = [];
-                          } else {
-                            _applyFilters();
-                          }
-                          });
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    // Ordenamiento
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        value: _selectedSort,
-                        hint: const Row(
-                          children: [
-                          Icon(Icons.filter_list, size: 18),
-                          SizedBox(width: 8),
-                          Text('Filtros'),
-                          ],
-                        ),
-                        items: const [
-                          DropdownMenuItem(
-                            value: 'Cercanía',
-                            child: Row(
-                              children: [
-                                Icon(Icons.near_me, size: 18),
-                                SizedBox(width: 8),
-                                Text('Cercanía'),
-                              ],
-                            ),
-                          ),
-                          DropdownMenuItem(
-                            value: 'Tiempo',
-                            child: Row(
-                              children: [
-                                Icon(Icons.access_time, size: 18),
-                                SizedBox(width: 8),
-                                Text('Hora salida'),
-                              ],
-                            ),
-                          ),
-                          DropdownMenuItem(
-                            value: 'Nombre',
-                            child: Row(
-                              children: [
-                                Icon(Icons.sort_by_alpha, size: 18),
-                                SizedBox(width: 8),
-                                Text('Nombre'),
-                              ],
-                            ),
-                          ),
-                          DropdownMenuItem(
-                            value: 'Precio',
-                            child: Row(
-                              children: [
-                                Icon(Icons.attach_money, size: 18),
-                                SizedBox(width: 8),
-                                Text('Precio'),
-                              ],
-                            ),
-                          ),
-                        ],
-                        onChanged: (value) {
-                          setState(() {
-                            _selectedSort = value!;
-                            _applyFilters();
-                          });
-                        },
-                      ),
-                    ),
-                  ],
-                ),
               ),
-              // Lista de resultados
-              _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : ListView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: _filteredBuses.length,
-                      itemBuilder: (context, index) {
-                        final bus = _filteredBuses[index];
-                        return Card(
-                          margin: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 8),
-                          child: ListTile(
-                            leading: const Icon(Icons.directions_bus, size: 36),
-                            title: Text(bus['nombre'] ?? 'Ruta sin nombre'),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('Salida: ${bus['horaSalida'] ?? 'N/A'}'),
-                                Text('Llegada: ${bus['horaLlegada'] ?? 'N/A'}'),
-                                Text(
-                                    'Precio: \$${(num.tryParse(bus['precio']?.toString() ?? '')?.toStringAsFixed(2) ?? '0.00')}'),
-                              ],
-                            ),
-                            trailing: const Icon(Icons.chevron_right),
-                            onTap: () {
-                              setState(() {
-                                _selectedBus = bus;
-                              });
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) =>
-                                      MapaScreen(selectedBus: bus),
-                                ),
-                              );
-                            },
-                          ),
-                        );
-                      },
-                    ),
-
-              // Mapa de rutas
-              const SizedBox(
-                height: 400,
-                child: MapaScreen(),
-              ),
-
-              // Mostrar autobús seleccionado
-              _buildSelectedBusCard(),
-
-              const SizedBox(height: 16),
-              // Rutas sugeridas
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Rutas sugeridas',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    RutasSugeridas(
-                      onBusSelected: (bus) {
-                        setState(() {
-                          _selectedBus = bus;
-                        });
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => SeatSelectionScreen(
-                              busData: bus,
-                              onTicketPurchased: _fetchBuses,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

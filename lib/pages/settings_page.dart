@@ -71,6 +71,24 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             ),
             MySettingsTile(
+              title: "Panel de Administrador",
+              action: IconButton(
+                icon: const Icon(Icons.admin_panel_settings),
+                onPressed: () {
+                  Navigator.of(context).pushNamed('/admin_panel');
+                },
+              ),
+            ),
+            MySettingsTile(
+              title: "Editor de Rutas",
+              action: IconButton(
+                icon: const Icon(Icons.edit_road),
+                onPressed: () {
+                  Navigator.of(context).pushNamed('/RouteEditorScreen');
+                },
+              ),
+            ),
+            MySettingsTile(
               title: "Salir de la cuenta",
               action: IconButton(
                 icon: const Icon(Icons.logout),

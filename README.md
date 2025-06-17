@@ -1,3 +1,3 @@
 # nau
 
-A new Flutter project.
+Aplicacion para manejo de rutas y visualizacion de autobuses 
